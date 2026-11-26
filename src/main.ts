@@ -12,6 +12,7 @@ import { tr } from './ui/i18n';
 import { renderMetricsPanel } from './ui/metricsPanel';
 import { renderProgress } from './ui/progress';
 import { restTimerExtra } from './ui/restTimer';
+import { syncVideoToActiveTake, takeSwitcher } from './ui/takeSwitcher';
 import { renderTimeline } from './ui/timeline';
 import { fileButton, loadTake } from './ui/upload';
 
@@ -33,12 +34,25 @@ const video = document.getElementById('video') as HTMLVideoElement;
 const header = document.getElementById('header')!;
 const canvas = document.getElementById('overlay') as HTMLCanvasElement;
 
-function renderHeader() {
+function renderHeader(s: AppState) {
   header.replaceChildren();
   const h1 = document.createElement('h1');
   h1.textContent = tr('app.title');
-  header.append(h1, fileButton(tr('upload.takeA'), (f) => loadTake(store, video, 'A', f)));
+  const busy = s.mode === 'processing';
+  const loadA = fileButton(tr('upload.takeA'), (f) => loadTake(store, video, 'A', f));
+  loadA.classList.toggle('disabled', busy);
+  const addB = fileButton(tr('upload.takeB'), (f) => loadTake(store, video, 'B', f));
+  addB.classList.toggle('disabled', busy || !s.takes.A?.poses);
+  header.append(h1, takeSwitcher(store), loadA, addB);
   mountDebug(header, store);
+}
+
+let headerKey: unknown[] = [];
+function maybeHeader(s: AppState) {
+  const k = [s.mode, s.lang, s.active, s.takes.A?.poses, s.takes.B?.poses, !!s.takes.A, !!s.takes.B];
+  if (k.every((v, i) => v === headerKey[i])) return;
+  headerKey = k;
+  renderHeader(s);
 }
 
 const sidebar = document.getElementById('sidebar')!;
@@ -47,7 +61,9 @@ const holdsEl = document.createElement('div');
 sidebar.append(checklistEl, holdsEl);
 
 startAnalysisRunner(store);
-renderHeader();
+maybeHeader(store.get());
+store.subscribe(maybeHeader);
+syncVideoToActiveTake(store, video);
 renderProgress(document.getElementById('progress')!, store);
 renderChecklist(checklistEl, store);
 renderHoldMarker(holdsEl, store, video, canvas);

@@ -6,6 +6,9 @@ type Lang = 'en' | 'he';
 const en: Record<string, string> = {
   'app.title': 'ClimbingLens',
   'upload.takeA': 'Load video (take A)',
+  'upload.takeB': '+ Add second take',
+  'take.A': 'Take A',
+  'take.B': 'Take B',
   'error.video': "This video format can't be played in Chrome. Convert to MP4 (H.264).",
   'error.pose': 'The pose model could not be loaded. Run "npm run setup" and reload.',
   'progress.processing': 'Analysing poses… {p}%',

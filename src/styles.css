@@ -118,3 +118,4 @@ button.active { background: var(--accent); color: #002; border-color: var(--acce
 #timeline .mark.event { inset-block: 0; inline-size: 3px; }
 #timeline .playhead { position: absolute; inset-block: 0; inline-size: 2px; background: #fff; box-shadow: 0 0 0 1px #000; }
 .rest-timer { margin-block-start: 0.5rem; font-size: 1.1rem; font-weight: 700; color: #ffd54f; }
+.switcher { display: inline-flex; gap: 0.25rem; }
