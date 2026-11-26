@@ -3,6 +3,7 @@ dist
 public/mediapipe
 public/models
 samples/
+.superpowers/
 *.mp4
 *.mov
 *.MOV

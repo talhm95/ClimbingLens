@@ -1,0 +1,22 @@
+{
+  "name": "climbinglens",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "node scripts/vitest.mjs",
+    "typecheck": "tsc --noEmit",
+    "setup": "node scripts/setup-assets.mjs"
+  },
+  "dependencies": {
+    "@mediapipe/tasks-vision": "^1.2.3"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.2"
+  }
+}
