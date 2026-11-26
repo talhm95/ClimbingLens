@@ -3,6 +3,7 @@ import { activeTake } from '../../state/selectors';
 import type { AppState, LayerDef } from '../../types';
 import { tr } from '../../ui/i18n';
 import { contactMarks, drawContacts } from './contacts';
+import { correctionMarks, correctionRows, drawCorrections } from './corrections';
 import { drawHolds } from './holds';
 import { drawSkeleton } from './skeleton';
 
@@ -31,6 +32,15 @@ export const LAYERS: LayerDef[] = [
     timelineMarks: contactMarks,
   },
   { id: 'touches', tier: 1, label: { en: 'Touch count', he: 'מספר מגעים' }, needs: ['poses'], metrics: touchRows },
+  {
+    id: 'footCorrections',
+    tier: 1,
+    label: { en: 'Foot corrections', he: 'תיקוני רגל' },
+    needs: ['poses'],
+    draw: drawCorrections,
+    metrics: correctionRows,
+    timelineMarks: correctionMarks,
+  },
 ];
 
 /** A layer is available once everything in its `needs` exists. */
