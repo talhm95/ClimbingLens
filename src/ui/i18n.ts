@@ -10,6 +10,8 @@ const en: Record<string, string> = {
   'error.pose': 'The pose model could not be loaded. Run "npm run setup" and reload.',
   'progress.processing': 'Analysing poses… {p}%',
   'empty.noVideo': 'Load a back-view tripod video to start.',
+  'checklist.title': 'Layers',
+  'checklist.tier2': 'Tier 2',
 };
 
 const he: Record<string, string> = {};

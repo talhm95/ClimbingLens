@@ -1,6 +1,8 @@
 import './styles.css';
 import { createStore } from './state/store';
 import type { AppState, LayerId } from './types';
+import { startRenderLoop } from './overlay/renderLoop';
+import { renderChecklist } from './ui/checklist';
 import { tr } from './ui/i18n';
 import { renderProgress } from './ui/progress';
 import { fileButton, loadTake } from './ui/upload';
@@ -29,8 +31,14 @@ function renderHeader() {
   header.append(h1, fileButton(tr('upload.takeA'), (f) => loadTake(store, video, 'A', f)));
 }
 
+const sidebar = document.getElementById('sidebar')!;
+const checklistEl = document.createElement('div');
+sidebar.append(checklistEl);
+
 renderHeader();
 renderProgress(document.getElementById('progress')!, store);
+renderChecklist(checklistEl, store);
+startRenderLoop(video, document.getElementById('overlay') as HTMLCanvasElement, store);
 store.subscribe((s) => {
   video.controls = s.mode !== 'processing';
 });
