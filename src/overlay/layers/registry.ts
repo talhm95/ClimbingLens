@@ -2,6 +2,7 @@
 import { activeTake } from '../../state/selectors';
 import type { AppState, LayerDef } from '../../types';
 import { tr } from '../../ui/i18n';
+import { drawAngles } from './angles';
 import { drawComparison } from './comparison';
 import { contactMarks, drawContacts } from './contacts';
 import { correctionMarks, correctionRows, drawCorrections } from './corrections';
@@ -29,6 +30,7 @@ export const LAYERS: LayerDef[] = [
   { id: 'holds', tier: 1, label: { en: 'Hold numbers', he: 'מספרי אחיזות' }, needs: ['holds'], draw: drawHolds },
   { id: 'weightShift', tier: 2, label: { en: 'Weight over the foot', he: 'משקל מעל הרגל' }, needs: ['poses'], draw: drawWeightShift, metrics: weightRows },
   { id: 'skeleton', tier: 1, label: { en: 'Stick figure', he: 'שלד' }, needs: ['poses'], draw: drawSkeleton },
+  { id: 'angles', tier: 2, label: { en: 'Elbow angles (2D)', he: 'זוויות מרפק (דו-ממד)' }, needs: ['poses'], draw: drawAngles },
   {
     id: 'contacts',
     tier: 1,
