@@ -6,6 +6,7 @@ import { contactMarks, drawContacts } from './contacts';
 import { correctionMarks, correctionRows, drawCorrections } from './corrections';
 import { drawHolds } from './holds';
 import { drawSkeleton } from './skeleton';
+import { timingRows } from './timing';
 
 function touchRows(s: AppState) {
   const m = activeTake(s)?.metrics;
@@ -41,6 +42,7 @@ export const LAYERS: LayerDef[] = [
     metrics: correctionRows,
     timelineMarks: correctionMarks,
   },
+  { id: 'timing', tier: 1, label: { en: 'Attempt & rest time', he: 'זמן ניסיון ומנוחה' }, needs: ['poses'], metrics: timingRows },
 ];
 
 /** A layer is available once everything in its `needs` exists. */

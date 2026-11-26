@@ -3,6 +3,7 @@ import { startRenderLoop } from './overlay/renderLoop';
 import { startAnalysisRunner } from './state/analysisRunner';
 import { createStore } from './state/store';
 import type { AppState, LayerId } from './types';
+import { renderAttemptMarker } from './ui/attemptMarker';
 import { renderChecklist } from './ui/checklist';
 import { renderContactList } from './ui/contactList';
 import { mountDebug } from './ui/debug';
@@ -10,6 +11,8 @@ import { renderHoldMarker } from './ui/holdMarker';
 import { tr } from './ui/i18n';
 import { renderMetricsPanel } from './ui/metricsPanel';
 import { renderProgress } from './ui/progress';
+import { restTimerExtra } from './ui/restTimer';
+import { renderTimeline } from './ui/timeline';
 import { fileButton, loadTake } from './ui/upload';
 
 const TIER1: LayerId[] = ['skeleton', 'holds', 'contacts', 'touches', 'footCorrections', 'timing', 'comparison'];
@@ -48,7 +51,9 @@ renderHeader();
 renderProgress(document.getElementById('progress')!, store);
 renderChecklist(checklistEl, store);
 renderHoldMarker(holdsEl, store, video, canvas);
-renderMetricsPanel(document.getElementById('metrics')!, store);
+renderMetricsPanel(document.getElementById('metrics')!, store, [restTimerExtra(store, video)]);
+renderTimeline(document.getElementById('timeline')!, store, video);
+renderAttemptMarker(document.getElementById('attempt-controls')!, store, video);
 renderContactList(document.getElementById('contacts')!, store, video);
 startRenderLoop(video, canvas, store);
 store.subscribe((s) => {

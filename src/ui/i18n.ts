@@ -28,6 +28,17 @@ const en: Record<string, string> = {
   'contacts.corrections': 'corrections:',
   'metrics.title': 'Metrics',
   'metrics.total': 'Total',
+  'attempts.start': 'Attempt start',
+  'attempts.end': 'Attempt end',
+  'attempts.clear': 'Clear attempts',
+  'attempts.auto': 'Auto-detect',
+  'attempts.badgeAuto': 'Auto',
+  'attempts.badgeManual': 'Manual',
+  'attempts.pending': 'Attempt started at',
+  'timing.source': 'Attempts',
+  'timing.attempt': 'Attempt {n}',
+  'timing.rest': 'Rest {n}',
+  'timing.restNow': 'Resting:',
 };
 
 const he: Record<string, string> = {};

@@ -107,3 +107,14 @@ button.active { background: var(--accent); color: #002; border-color: var(--acce
 .worse { color: var(--danger); }
 .muted { color: var(--muted); }
 .hint { color: var(--muted); font-size: 0.85rem; }
+
+/* Timeline */
+#timeline .band { position: absolute; inset-block: 0; }
+#timeline .band.attempt { background: rgba(0, 194, 168, 0.35); border-inline: 2px solid var(--accent); }
+#timeline .band.attempt.auto { background: rgba(0, 194, 168, 0.2); border: 2px dashed var(--accent); }
+#timeline .band.rest { background: rgba(255, 255, 255, 0.06); }
+#timeline .mark { position: absolute; inline-size: 2px; margin-inline-start: -1px; }
+#timeline .mark.tick { inset-block: 30% 30%; }
+#timeline .mark.event { inset-block: 0; inline-size: 3px; }
+#timeline .playhead { position: absolute; inset-block: 0; inline-size: 2px; background: #fff; box-shadow: 0 0 0 1px #000; }
+.rest-timer { margin-block-start: 0.5rem; font-size: 1.1rem; font-weight: 700; color: #ffd54f; }
