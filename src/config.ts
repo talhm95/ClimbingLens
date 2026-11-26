@@ -3,12 +3,14 @@
 export const SAMPLE_RATE = 15;        // pose samples per second (D11)
 export const MODEL: 'full' | 'heavy' = 'full'; // Q3
 export const SWAP_LR = false;         // Q2
-export const NUM_POSES = 2;           // candidates per frame (D36)
+export const NUM_POSES = 3;           // candidates per frame (D36; 3 so spectators cannot crowd out the climber, D39)
 export const CLIMBER_MAX_JUMP = 1.5;  // body scales between frames (D36)
-export const CLIMBER_RESET = 1.0;     // s without a chosen pose before continuity is dropped (D36)
+export const CLIMBER_RESET = 1.0;     // s without a match before a person's tracklet ends (D36, D39)
+export const CLIMBER_MIN_SPEED = 0.15; // torso lengths / s averaged over a tracklet; slower = spectator (D39)
 export const MIN_VISIBILITY = 0.5;    // D14
 export const MAX_INTERP_GAP = 0.3;    // s (D14)
 export const SMOOTH_SIGMA = 1;        // samples, Gaussian, per contiguous run (D17)
+export const FALLBACK_BODY_SCALE = 0.15; // fraction of video height, only when no torso is ever seen
 export const STILL_SPEED = 0.5;       // body scales / s (D15)
 export const MIN_STILL = 0.3;         // s (D15)
 export const HOLD_RADIUS = 0.6;       // body scales, enter a hold (D15)

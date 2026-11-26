@@ -1,9 +1,10 @@
 // Runs MediaPipe PoseLandmarker once over a whole video (ARCHITECTURE.md section 4.1).
 import { FilesetResolver, PoseLandmarker } from '@mediapipe/tasks-vision';
-import { pelvisOf, pickClimber } from '../analysis/pickClimber';
-import { CLIMBER_RESET, MODEL, NUM_POSES, SAMPLE_RATE, SWAP_LR } from '../config';
-import type { Landmark, PoseFrame, PoseTrack, Vec } from '../types';
+import { chooseClimber } from '../analysis/pickClimber';
+import { MODEL, NUM_POSES, SAMPLE_RATE, SWAP_LR } from '../config';
+import type { Landmark, PoseFrame, PoseTrack } from '../types';
 import { LR_PAIRS } from './landmarks';
+import { installOfflineGuard } from './offlineGuard';
 
 let landmarker: PoseLandmarker | null = null;
 let initPromise: Promise<void> | null = null;
@@ -13,6 +14,7 @@ let tsBase = 0;
 const base = import.meta.env.BASE_URL;
 
 async function create(delegate: 'GPU' | 'CPU'): Promise<PoseLandmarker> {
+  installOfflineGuard();
   const fileset = await FilesetResolver.forVisionTasks(`${base}mediapipe/wasm`);
   return PoseLandmarker.createFromOptions(fileset, {
     baseOptions: { modelAssetPath: `${base}models/pose_landmarker_${MODEL}.task`, delegate },
@@ -68,9 +70,7 @@ export async function processVideo(video: HTMLVideoElement, onProgress: (p: numb
   const lmk = landmarker!;
   const dims = { videoW: video.videoWidth, videoH: video.videoHeight };
   const n = Math.max(1, Math.floor(video.duration * SAMPLE_RATE));
-  const frames: PoseFrame[] = [];
-  let prevPelvis: Vec | null = null;
-  let lastChosen = -Infinity;
+  const cands: Landmark[][][] = [];
   video.pause();
 
   for (let i = 0; i < n; i++) {
@@ -78,20 +78,17 @@ export async function processVideo(video: HTMLVideoElement, onProgress: (p: numb
     await seek(video, t);
     const ts = tsBase + Math.round(t * 1000);
     const result = lmk.detectForVideo(video, ts);
-    let candidates: Landmark[][] = (result.landmarks ?? []).map((pts) =>
+    let people: Landmark[][] = (result.landmarks ?? []).map((pts) =>
       pts.map((p) => ({ x: p.x, y: p.y, v: p.visibility ?? 0 })),
     );
-    if (SWAP_LR) candidates = candidates.map(swapLR);
-    if (t - lastChosen > CLIMBER_RESET) prevPelvis = null;
-    const lm = pickClimber(candidates, prevPelvis, dims);
-    if (lm) {
-      prevPelvis = pelvisOf(lm);
-      lastChosen = t;
-    }
-    frames.push({ t, lm });
+    if (SWAP_LR) people = people.map(swapLR);
+    cands.push(people);
     if (i % 5 === 0) onProgress(i / n);
   }
   tsBase += Math.round(video.duration * 1000) + 1000;
+  // The climber is chosen over the whole clip, not frame by frame (D39).
+  const chosen = chooseClimber(cands, dims, SAMPLE_RATE);
+  const frames: PoseFrame[] = chosen.map((lm, i) => ({ t: i / SAMPLE_RATE, lm }));
   onProgress(1);
   return { sampleRate: SAMPLE_RATE, videoW: dims.videoW, videoH: dims.videoH, frames };
 }

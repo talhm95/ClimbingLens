@@ -296,3 +296,19 @@ rules, the merge rule behind corrections). Every adapted file starts with:
 Nothing is copied verbatim. The logic is re-implemented in TypeScript.
 **Why:** SPEC.md section 8: keep the licence notice, credit the source, and say in the pitch what was reused.
 Whether hackathon rules allow reuse is still open (SPEC.md section 12).
+
+## Real-clip check (added 2026-11-26, during the overnight build; Tal was away)
+
+**D39. Q:** The real clips have spectators between the camera and the wall. Who is the climber?
+**A:** Chosen over the **whole clip** after processing, not frame by frame. Up to 3 people are
+detected per frame (`NUM_POSES = 3`). Each person is linked from frame to frame into a track with
+D36's continuity rule (within 1.5 torso lengths, gaps up to 1 s). Tracks whose pelvis moves slower
+than `CLIMBER_MIN_SPEED` (0.15 torso lengths/s on average, measured at 1 s steps so jitter does not
+add up) are spectators and are never chosen, unless nobody moves at all. In each frame the person
+whose track travelled furthest is the climber; if only spectators are seen, the frame is `null`.
+**Why:** D36 assumed the climber is the largest person in the frame. On `ALMA QW5` a seated
+spectator near the camera had the longer torso, so the lock started on her at 19 s and continuity
+kept it there for the rest of the clip. Over a whole clip the climber is the one who moves; a
+spectator barely does. `pickClimber` (D36) is kept as the frame-to-frame linking rule. This
+supersedes D36's "longest torso" start only. Override: set `CLIMBER_MIN_SPEED = 0` and
+`NUM_POSES = 2` to get close to the old behaviour.

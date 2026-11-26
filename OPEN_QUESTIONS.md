@@ -8,12 +8,23 @@ Plan task 6 (real-clip check) needs one. Without it, the contact thresholds are
 only tested on synthetic data.
 *Until answered:* tasks 1–5 and all unit tests go ahead. Task 6 is skipped and
 flagged. Drop clips into `samples/` (it is git-ignored, so there is no need to commit videos).
+> **Answered 2026-11-26 (Tal added clips).** `samples/סלאב` and `samples/בולדרינג רגיל`: iPhone
+> HEVC `.MOV`, portrait 1080×1920, mostly ~5 min, competition walls with spectators in the
+> foreground. Headless Chrome on this laptop decodes them, so no conversion was needed. Processing
+> takes about 2.3× the clip length headless (79 s clip → 3 min); a 5-min clip → ~11 min. That is
+> slow for "before the next attempt": trim clips to the attempt before uploading, or see Q16.
 
 **Q2. In back view, does MediaPipe swap left and right?**
 SPEC.md section 6 says "check early". If the swap is *consistent* on your footage, the fix is one
 setting (`SWAP_LR` in `config.ts`). If it *flips between frames*, contact
 detection per limb needs a fix-up pass (about 30–45 min extra, not in the estimate).
 *Until answered:* `SWAP_LR = false`, checked in task 6.
+> **Checked 2026-11-26 on `ALMA QW5` (slab, 79 s).** No consistent swap: the left shoulder is on
+> the image left in 81% of frames (hips 78%), so `SWAP_LR` stays `false`. The order flips about 76
+> times, mostly while the climber turns or is half hidden, so some single frames have L/R swapped.
+> Contacts are smoothed and need 0.5 s of dwell, so a one-frame flip does not create a contact, but
+> a longer flip would label a hand as the other hand. Please watch for it in the demo clips (the
+> left-side bones of the stick figure are drawn light blue to make it easy to see).
 
 **Q3. Is the climber big enough in the frame for the pose model?**
 Some sample clips have the climber at 15–25% of the frame height. MediaPipe can lose
@@ -21,6 +32,12 @@ small people. Options if it fails: (a) the `heavy` model (slower, one-line chang
 (b) re-film closer for the demo, (c) a manual crop box before processing (a new
 feature, not planned).
 *Until answered:* `full` model, with `heavy` as a config fallback. Crop box not built.
+> **Checked 2026-11-26 on `ALMA QW5`.** The climber's torso is ~74 px of 1920 (about 4% of the
+> frame height, smaller than assumed), and the `full` model still finds her: a pose on 61% of all
+> frames once spectators are filtered out (D39), and most of the missing frames are before she
+> starts or while she walks off. Feet are visible (v ≥ 0.5) on 92–94% of her frames, the left hand
+> on 72%, the right hand only on 44%. Hand contacts will be under-counted when a hand is hidden.
+> `heavy` was not tried (about 3× slower).
 
 **Q4. Which tablet or laptop runs the demo, and is it Chrome?**
 Everything is planned and tested for desktop Chrome. iPhone `.mov` (HEVC) files may not
@@ -83,6 +100,18 @@ can fall back to "a hand on a hold and both feet still".
 Climber selection (D36) locks onto the longest torso in the first frame with a person. If a passer-by
 nearer the camera is there at that moment, the lock can start on them. *Until answered:* trim
 clips so they start with the climber in view.
+> **Happened on the real clips; changed (D39).** In `ALMA QW5` a spectator sits between the camera
+> and the wall. The longest-torso rule locked onto her from 19 s to the end. Climber selection now
+> looks at the whole clip: every detected person (up to 3 per frame) is linked into tracks, people
+> who barely move are ignored, and the one who travels furthest wins. On that clip the stick figure
+> now stays on the climber. A spectator who walks around a lot could still win: please check.
+
+**Q16. Processing speed.** *(new, from the real clips)*
+Seeking frame by frame through an HEVC 1080p clip runs at about 2.3× the clip length headless
+(79 s → 3 min; 5 min → ~11 min). In a normal Chrome window with the GPU it may be faster; not
+measured. Options: trim the clip to the attempt first (no code), sample at 10/s instead of 15/s
+(`SAMPLE_RATE`, one line, a bit less timing precision), or decode while playing instead of seeking
+(a rewrite of `processVideo`, about 1 h). *Until answered:* unchanged.
 
 **Q11. Commit the planning docs?**
 Nothing is committed (`main` has no commits). Review the docs, then
