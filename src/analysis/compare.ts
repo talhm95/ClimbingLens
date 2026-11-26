@@ -41,6 +41,7 @@ export function diffMetrics(a: Metrics, b: Metrics, enabled: Record<LayerId, boo
   const ta = a.tier2;
   const tb = b.tier2;
   if (ta && tb) {
+    if (enabled.drops) rows.push(row('drops.total', ta.drops, tb.drops, 'count'));
     if (enabled.weightShift) rows.push(row('offBalance', ta.offBalance * 100, tb.offBalance * 100, '%'));
   }
   return rows;

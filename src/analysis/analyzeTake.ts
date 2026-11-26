@@ -2,6 +2,7 @@
 import type { Attempt, Contact, Metrics, Take, Tier2Results } from '../types';
 import { detectAttempts } from './autoAttempts';
 import { clipToAttempts, detectContacts } from './contacts';
+import { detectDrops } from './drops';
 import { heatmap } from './heatmap';
 import { bodyScale } from './limbs';
 import { computeMetrics, normalizeAttempts } from './metrics';
@@ -25,7 +26,11 @@ export function analyzeTake(take: Take): TakeAnalysis {
   const attempts = normalizeAttempts(marked, take.duration);
   const contacts = clipToAttempts(all, attempts);
 
-  const tier2: Tier2Results = { heatmap: heatmap(track, contacts), drops: [], jumps: [] };
+  const tier2: Tier2Results = {
+    heatmap: heatmap(track, contacts),
+    drops: detectDrops({ track, S, holds: take.holds }, contacts),
+    jumps: [],
+  };
   const metrics: Metrics = {
     ...computeMetrics(contacts, attempts),
     tier2: { drops: tier2.drops.length, jumps: tier2.jumps.length, firstJumpSpeed: null, offBalance: offBalanceFraction(track, contacts, attempts) },

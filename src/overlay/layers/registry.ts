@@ -4,6 +4,7 @@ import type { AppState, LayerDef } from '../../types';
 import { tr } from '../../ui/i18n';
 import { drawAngles } from './angles';
 import { drawComparison } from './comparison';
+import { dropMarks, dropRows } from './drops';
 import { contactMarks, drawContacts } from './contacts';
 import { correctionMarks, correctionRows, drawCorrections } from './corrections';
 import { drawHeatmap } from './heatmap';
@@ -50,6 +51,7 @@ export const LAYERS: LayerDef[] = [
     timelineMarks: correctionMarks,
   },
   { id: 'timing', tier: 1, label: { en: 'Attempt & rest time', he: 'זמן ניסיון ומנוחה' }, needs: ['poses'], metrics: timingRows },
+  { id: 'drops', tier: 2, label: { en: 'Hand/foot drops', he: 'החלקות יד/רגל' }, needs: ['poses'], metrics: dropRows, timelineMarks: dropMarks },
   { id: 'comparison', tier: 1, label: { en: 'Compare with take A', he: 'השוואה לסרטון A' }, needs: ['takeB'], draw: drawComparison },
 ];
 

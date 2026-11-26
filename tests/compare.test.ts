@@ -81,3 +81,11 @@ describe('diffMetrics Tier 2 rows (D33)', () => {
     expect(rows[0].delta).toBeCloseTo(-20, 9);
   });
 });
+
+describe('diffMetrics drop rows', () => {
+  it('drops gives a drops.total count row', () => {
+    const a = { ...metrics(0, 0, 10), tier2: { drops: 3, jumps: 0, firstJumpSpeed: null, offBalance: 0 } };
+    const b = { ...metrics(0, 0, 10), tier2: { drops: 1, jumps: 0, firstJumpSpeed: null, offBalance: 0 } };
+    expect(diffMetrics(a, b, only('drops'))).toEqual([{ key: 'drops.total', a: 3, b: 1, delta: -2, unit: 'count' }]);
+  });
+});
