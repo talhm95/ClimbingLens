@@ -4,6 +4,7 @@ import { detectAttempts } from './autoAttempts';
 import { clipToAttempts, detectContacts } from './contacts';
 import { detectDrops } from './drops';
 import { heatmap } from './heatmap';
+import { detectJumps } from './jump';
 import { bodyScale } from './limbs';
 import { computeMetrics, normalizeAttempts } from './metrics';
 import { offBalanceFraction } from './weightShift';
@@ -29,11 +30,11 @@ export function analyzeTake(take: Take): TakeAnalysis {
   const tier2: Tier2Results = {
     heatmap: heatmap(track, contacts),
     drops: detectDrops({ track, S, holds: take.holds }, contacts),
-    jumps: [],
+    jumps: detectJumps(track, contacts, attempts),
   };
   const metrics: Metrics = {
     ...computeMetrics(contacts, attempts),
-    tier2: { drops: tier2.drops.length, jumps: tier2.jumps.length, firstJumpSpeed: null, offBalance: offBalanceFraction(track, contacts, attempts) },
+    tier2: { drops: tier2.drops.length, jumps: tier2.jumps.length, firstJumpSpeed: tier2.jumps[0]?.speed ?? null, offBalance: offBalanceFraction(track, contacts, attempts) },
   };
   return { contacts, metrics, attempts, tier2 };
 }

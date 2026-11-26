@@ -89,3 +89,19 @@ describe('diffMetrics drop rows', () => {
     expect(diffMetrics(a, b, only('drops'))).toEqual([{ key: 'drops.total', a: 3, b: 1, delta: -2, unit: 'count' }]);
   });
 });
+
+describe('diffMetrics jump rows', () => {
+  it('jump gives a count row and a first take-off speed row in S/s', () => {
+    const a = { ...metrics(0, 0, 10), tier2: { drops: 0, jumps: 2, firstJumpSpeed: 3.2, offBalance: 0 } };
+    const b = { ...metrics(0, 0, 10), tier2: { drops: 0, jumps: 1, firstJumpSpeed: 4.0, offBalance: 0 } };
+    const rows = diffMetrics(a, b, only('jump'));
+    expect(rows.map((r) => [r.key, r.unit])).toEqual([['jumps.count', 'count'], ['jumps.firstSpeed', 'S/s']]);
+    expect(rows[1].delta).toBeCloseTo(0.8, 9);
+  });
+
+  it('no speed row when a take has no jump', () => {
+    const a = { ...metrics(0, 0, 10), tier2: { drops: 0, jumps: 0, firstJumpSpeed: null, offBalance: 0 } };
+    const b = { ...metrics(0, 0, 10), tier2: { drops: 0, jumps: 1, firstJumpSpeed: 4.0, offBalance: 0 } };
+    expect(diffMetrics(a, b, only('jump')).map((r) => r.key)).toEqual(['jumps.count']);
+  });
+});

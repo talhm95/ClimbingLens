@@ -43,6 +43,12 @@ export function diffMetrics(a: Metrics, b: Metrics, enabled: Record<LayerId, boo
   if (ta && tb) {
     if (enabled.drops) rows.push(row('drops.total', ta.drops, tb.drops, 'count'));
     if (enabled.weightShift) rows.push(row('offBalance', ta.offBalance * 100, tb.offBalance * 100, '%'));
+    if (enabled.jump) {
+      rows.push(row('jumps.count', ta.jumps, tb.jumps, 'count'));
+      if (ta.firstJumpSpeed !== null && tb.firstJumpSpeed !== null) {
+        rows.push(row('jumps.firstSpeed', ta.firstJumpSpeed, tb.firstJumpSpeed, 'S/s'));
+      }
+    }
   }
   return rows;
 }

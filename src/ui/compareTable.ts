@@ -15,6 +15,7 @@ function rowLabel(key: string): string {
   const [group, part] = key.split('.');
   const name = tr(`diff.${group}`);
   if (part === 'total') return `${name} (${tr('metrics.total')})`;
+  if (part === 'firstSpeed') return tr('jump.firstSpeed');
   if (part === 'LH' || part === 'RH' || part === 'LF' || part === 'RF') return `${name} ${part}`;
   return name;
 }
@@ -48,7 +49,9 @@ export const compareTableExtra: PanelExtra = (root, s: AppState) => {
     l.textContent = rowLabel(r.key);
     const v = document.createElement('span');
     const delta = bdi(signed(r.delta, r.unit));
-    delta.className = r.delta < 0 ? 'better' : r.delta > 0 ? 'worse' : 'muted';
+    // Fewer and shorter is better; jumps are neutral (faster is not always better, D33).
+    const neutral = r.key.startsWith('jumps.');
+    delta.className = neutral || r.delta === 0 ? 'muted' : r.delta < 0 ? 'better' : 'worse';
     // Separate runs plus a direction-aware arrow: "6 → 2" in English, A on the right in Hebrew.
     v.append(bdi(fmt(r.a, r.unit)), ` ${tr('arrow')} `, bdi(fmt(r.b, r.unit)), ' (', delta, ')');
     line.append(l, v);
