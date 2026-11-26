@@ -5,10 +5,11 @@ import { createStore } from './state/store';
 import type { AppState, LayerId } from './types';
 import { renderAttemptMarker } from './ui/attemptMarker';
 import { renderChecklist } from './ui/checklist';
+import { compareTableExtra } from './ui/compareTable';
 import { renderContactList } from './ui/contactList';
 import { mountDebug } from './ui/debug';
 import { renderHoldMarker } from './ui/holdMarker';
-import { tr } from './ui/i18n';
+import { setLang, tr } from './ui/i18n';
 import { renderMetricsPanel } from './ui/metricsPanel';
 import { renderProgress } from './ui/progress';
 import { restTimerExtra } from './ui/restTimer';
@@ -45,6 +46,24 @@ function renderHeader(s: AppState) {
   addB.classList.toggle('disabled', busy || !s.takes.A?.poses);
   header.append(h1, takeSwitcher(store), loadA, addB);
   mountDebug(header, store);
+  header.append(langToggle(s));
+}
+
+function langToggle(s: AppState): HTMLElement {
+  const wrap = document.createElement('div');
+  wrap.className = 'switcher';
+  for (const l of ['en', 'he'] as const) {
+    const b = document.createElement('button');
+    b.textContent = tr(`lang.${l}`);
+    b.lang = l;
+    b.classList.toggle('active', s.lang === l);
+    b.addEventListener('click', () => {
+      setLang(l);
+      store.set({ lang: l });
+    });
+    wrap.append(b);
+  }
+  return wrap;
 }
 
 let headerKey: unknown[] = [];
@@ -67,7 +86,7 @@ syncVideoToActiveTake(store, video);
 renderProgress(document.getElementById('progress')!, store);
 renderChecklist(checklistEl, store);
 renderHoldMarker(holdsEl, store, video, canvas);
-renderMetricsPanel(document.getElementById('metrics')!, store, [restTimerExtra(store, video)]);
+renderMetricsPanel(document.getElementById('metrics')!, store, [restTimerExtra(store, video), compareTableExtra]);
 renderTimeline(document.getElementById('timeline')!, store, video);
 renderAttemptMarker(document.getElementById('attempt-controls')!, store, video);
 renderContactList(document.getElementById('contacts')!, store, video);

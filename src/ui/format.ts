@@ -9,9 +9,13 @@ export function secs(d: number): string {
   return `${d.toFixed(1)} s`;
 }
 
-/** A <bdi> element, so numbers and times keep their order inside Hebrew text. */
+/**
+ * A left-to-right isolated run (<bdi dir="ltr">) for a time, number or limb code, so it keeps its
+ * own order inside Hebrew text and never reorders the text around it.
+ */
 export function bdi(text: string): HTMLElement {
   const el = document.createElement('bdi');
+  el.dir = 'ltr';
   el.textContent = text;
   return el;
 }
