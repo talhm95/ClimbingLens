@@ -1,23 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { analyzeTake } from '../src/analysis/analyzeTake';
-import type { Hold, PoseTrack, Take } from '../src/types';
 import { still, synthTrack } from './fixtures/synth';
+import { takeOf } from './fixtures/take';
 
-export function takeOf(poses: PoseTrack | null, holds: Hold[], extra: Partial<Take> = {}): Take {
-  return {
-    id: 'A',
-    fileName: 'synth.mp4',
-    url: '',
-    duration: poses ? poses.frames.length / poses.sampleRate : 0,
-    poses,
-    holds,
-    attempts: [],
-    attemptsSource: 'manual',
-    contacts: [],
-    metrics: null,
-    ...extra,
-  };
-}
 
 describe('analyzeTake', () => {
   const track = synthTrack({ duration: 2, limbs: { LF: still(0.5, 0.8, 0, 2), RH: still(0.5, 0.3, 0, 2) } });

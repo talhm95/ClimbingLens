@@ -95,6 +95,12 @@ Auto attempt start (D37) needs **both feet on holds**. If only handholds are cli
 found and the whole video counts as one attempt (manual marks still work). SPEC.md section 3 says "every hold on the
 route gets a number", so the plan assumes footholds are clicked. Say so if not, and the start rule
 can fall back to "a hand on a hold and both feet still".
+> **Seen on `ALMA QW5` (2026-11-26, with stand-in holds placed at the climber's still points, not
+> real clicks):** the rule needs both feet *and* a hand detected on holds at the same moment. Hands
+> are often hidden in back view (the right hand is visible on 44% of frames), so the start was found
+> about 5 s late (25.5 s instead of ~20 s). The same fallback would help here. Manual marks override
+> it either way. Also: after a top-out the next start is only looked for once the climber has left
+> the wall, so hanging on the top hold does not open a second attempt.
 
 **Q15. Can a passer-by be in the frame when the video starts?**
 Climber selection (D36) locks onto the longest torso in the first frame with a person. If a passer-by
