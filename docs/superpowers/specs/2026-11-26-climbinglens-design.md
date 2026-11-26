@@ -52,10 +52,16 @@ Option A browser-only; manual hold numbering by clicking on the first frame; Tie
 before Tier 2; SPEC.md section 7 stays out.
 
 ## Decided by Claude (see DECISIONS.md)
-Contacts = still segments merged into placements; corrections = re-settles on the same
+Contacts = on a hold with hysteresis and settled (revised, see below); corrections = re-settles on the same
 hold (D15, D16). Normalized coordinates plus body-scale units (D13). Take A = reference,
 and B copies A's holds (D19, D20). Alignment by hold first-touch anchors with a
 piecewise-linear map (D21). Checklist driven by a layer registry (D25).
+
+## Revised after the reference-repo review (2026-11-26, approved by Tal)
+Contacts now require both "on a hold, with hysteresis" and "settled" (D15–D16). Smoothing is lighter and
+runs per contiguous run (D17). The climber is picked out when other people are in the frame (D36).
+Automatic attempt start and end is added by Tal, with manual override (D18, D37). The adapted
+logic is credited in CREDITS.md (D38).
 
 ## Left to the builder
 Exact pixel styling, colours per limb, the blink rate of the correction dot, and

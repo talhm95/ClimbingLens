@@ -10,7 +10,9 @@
 
 **Spec:** `SPEC.md` (source of truth) → `docs/superpowers/specs/2026-11-26-climbinglens-design.md` → `ARCHITECTURE.md` (types, signatures, folder layout). Decisions: `DECISIONS.md` (D#). Unresolved: `OPEN_QUESTIONS.md` (Q#).
 
-**Time budget:** Tier 1 = tasks 1–15, about **4 h 35 min** in total. The first working slice (upload → stick figure → one checkbox) is done after task 3 (about 1 h).
+**Time budget:** Tier 1 = tasks 1–15 plus 10b, about **5 h 20 min** in total. The first working slice (upload → stick figure → one checkbox) is done after task 3 (about 1 h 10 min).
+
+**Reference repo:** contact hysteresis and dwell, per-run smoothing, climber selection and the attempt start/top-out rules are adapted from `jeremyipark/vision-demos/rock_climbing` (Apache-2.0), re-implemented in TypeScript. Credit rules: D38.
 
 ## Global Constraints
 
@@ -28,24 +30,31 @@
 export const SAMPLE_RATE = 15;        // pose samples per second (D11)
 export const MODEL = 'full';          // 'full' | 'heavy' (Q3)
 export const SWAP_LR = false;         // Q2
+export const NUM_POSES = 2;           // candidates per frame (D36)
+export const CLIMBER_MAX_JUMP = 1.5;  // body scales between frames (D36)
 export const MIN_VISIBILITY = 0.5;    // D14
 export const MAX_INTERP_GAP = 0.3;    // s (D14)
-export const SMOOTH_WINDOW = 5;       // samples (D17)
+export const SMOOTH_SIGMA = 1;        // samples, Gaussian, per contiguous run (D17)
 export const STILL_SPEED = 0.5;       // body scales / s (D15)
 export const MIN_STILL = 0.3;         // s (D15)
-export const HOLD_RADIUS = 0.6;       // body scales (D15)
-export const CORRECTION_GAP = 1.5;    // s (D16)
+export const HOLD_RADIUS = 0.6;       // body scales, enter a hold (D15)
+export const RELEASE_RADIUS = 1.0;    // body scales, leave a hold (D15)
+export const HOLD_DWELL = 0.5;        // s on a hold before it counts (D15)
 export const BLINK_WINDOW = 0.6;      // s each side of a correction
+export const START_DWELL = 0.4;       // s, auto attempt start (D37)
+export const START_DWELL_DECAY = 1;   // samples lost per miss, leaky (D37)
+export const TOP_DWELL = 0.5;         // s, both hands on the top hold (D37)
+export const END_GAP = 1.0;           // s with no limb on a hold = fall (D37)
 ```
 
 ## Review Focus
 
 Inputs the spec implies that a real user will hit, with the test that pins each:
 
-1. **Climber lost for a stretch** (out of frame, occluded, `lm: null` for > 0.3 s): one still period must not be bridged into one contact across the gap. *Pinned:* task 7 test `splits a still run at a long missing-data gap`.
+1. **Climber lost for a stretch** (out of frame, occluded, `lm: null` for > 0.3 s): one contact must not be bridged across the gap. *Pinned:* task 7 test `splits a contact at a long missing-data gap`.
 2. **Holds edited after processing** (a hold added or undone): contacts and metrics must update without reprocessing the video. *Pinned:* task 8 test `analyzeTake reflects changed holds`.
 3. **Take B touches holds in a different order** (skips one, goes back): the alignment must stay monotonic and must not crash. *Pinned:* task 12 test `drops anchors that break monotonic order`.
-4. **Attempt marks entered badly** (end before start, overlapping, or none): duration and rest must still make sense. *Pinned:* task 10 tests on `normalizeAttempts`.
+4. **Attempt marks entered badly** (end before start, overlapping, or none), **or auto-detection finds nothing**: duration and rest must still make sense. *Pinned:* task 10 tests on `normalizeAttempts`, and task 10b test `no start detected gives []`.
 5. **No holds marked, or no shared holds between takes**: contacts get `holdId: null`, and comparison falls back to a linear stretch. *Pinned:* task 8 test `zero holds gives null holdIds` and task 12 test `falls back to linear stretch`.
 
 Also checked by hand in task 2: a file Chrome cannot decode shows an error message instead of hanging.
@@ -57,7 +66,7 @@ Also checked by hand in task 2: a file Chrome cannot decode shows an error messa
 ### Task 1: Project scaffold and offline assets (15 min)
 
 **Files:**
-- Create: `package.json`, `tsconfig.json`, `vite.config.ts`, `index.html`, `src/main.ts`, `src/styles.css`, `scripts/setup-assets.mjs`, `.gitignore`, `tests/smoke.test.ts`
+- Create: `package.json`, `tsconfig.json`, `vite.config.ts`, `index.html`, `src/main.ts`, `src/styles.css`, `scripts/setup-assets.mjs`, `.gitignore`, `tests/smoke.test.ts`, `CREDITS.md`
 
 **Interfaces:**
 - Produces: npm scripts `dev`, `build`, `test` (`vitest run`), `typecheck` (`tsc --noEmit`), `setup` (`node scripts/setup-assets.mjs`). Static assets served at `/mediapipe/wasm/` and `/models/pose_landmarker_full.task` (also `_heavy`).
@@ -70,6 +79,7 @@ Also checked by hand in task 2: a file Chrome cannot decode shows an error messa
 - [ ] **Step 4:** `.gitignore`: `node_modules`, `dist`, `public/mediapipe`, `public/models`, `samples`.
 - [ ] **Step 5:** `index.html` = the layout shell from ARCHITECTURE.md section 7 with empty containers: `#header`, `#stage` (`<video id="video">` + `<canvas id="overlay">` stacked), `#sidebar`, `#timeline`, `#metrics`, `#contacts`. `styles.css`: CSS grid, the font stack from Global Constraints, logical properties only.
 - [ ] **Step 6:** `tests/smoke.test.ts`: `expect(1 + 1).toBe(2)`.
+- [ ] **Step 7:** `CREDITS.md` as described in D38: the repo URL, "Apache-2.0", the list of adapted ideas, and "re-implemented in TypeScript, no code copied". Also add a credits line for MediaPipe (Apache-2.0).
 
 **Done:** The app opens with an empty three-area layout in the sans-serif font. Assets are on disk.
 **Check:** `npm run setup` → `public/models/pose_landmarker_full.task` exists (~9 MB). `npm test` → 1 passed. `npm run typecheck` → no errors. `npm run dev` → open the URL in Chrome and see the empty layout.
@@ -77,25 +87,34 @@ Also checked by hand in task 2: a file Chrome cannot decode shows an error messa
 
 ---
 
-### Task 2: Types, store, upload and pose processing (25 min)
+### Task 2: Types, store, upload and pose processing (35 min)
 
 **Files:**
-- Create: `src/types.ts` (all types in ARCHITECTURE.md section 3, verbatim), `src/config.ts` (Global Constraints block), `src/state/store.ts`, `src/pose/landmarks.ts`, `src/pose/poseRunner.ts`, `src/ui/upload.ts`, `src/ui/progress.ts`, `src/ui/i18n.ts` (English only for now)
+- Create: `src/types.ts` (all types in ARCHITECTURE.md section 3, verbatim; a new `Take` starts with `attemptsSource: 'auto'`), `src/config.ts` (Global Constraints block), `src/state/store.ts`, `src/pose/landmarks.ts`, `src/pose/poseRunner.ts`, `src/analysis/pickClimber.ts`, `src/ui/upload.ts`, `src/ui/progress.ts`, `src/ui/i18n.ts` (English only for now)
 - Modify: `src/main.ts`
-- Test: `tests/store.test.ts`
+- Test: `tests/store.test.ts`, `tests/pickClimber.test.ts`
 
 **Interfaces:**
 - Produces:
   - `createStore<T>(init: T): { get(): T; set(patch: Partial<T> | ((s: T) => Partial<T>)): void; subscribe(fn: (s: T) => void): () => void }`
   - `updateTake(store: Store<AppState>, id: 'A'|'B', patch: Partial<Take>): void` (in `store.ts`)
   - `landmarks.ts`: `LM` index constants (`L_SHOULDER=11, R_SHOULDER=12, L_ELBOW=13, R_ELBOW=14, L_WRIST=15, R_WRIST=16, L_PINKY=17, R_PINKY=18, L_INDEX=19, R_INDEX=20, L_HIP=23, R_HIP=24, L_HEEL=29, R_HEEL=30, L_FOOT=31, R_FOOT=32`), `SKELETON_EDGES: [number, number][]`, and `LR_PAIRS: [number, number][]`
-  - `initPose(): Promise<void>` (GPU, falling back to CPU), `processVideo(video: HTMLVideoElement, onProgress: (p: number) => void): Promise<PoseTrack>`
+  - `initPose(): Promise<void>` (GPU, falling back to CPU; `numPoses: NUM_POSES`), `processVideo(video: HTMLVideoElement, onProgress: (p: number) => void): Promise<PoseTrack>`
+  - `pickClimber(candidates: Landmark[][], prevPelvis: Vec | null, dims: { videoW: number; videoH: number }): Landmark[] | null` (pure, D36). Torso length and distances are in pixels. A candidate more than `CLIMBER_MAX_JUMP` torso lengths from `prevPelvis` is rejected.
   - `tr(key: string): string`, `setLang(lang: 'en'|'he'): void`
 
 - [ ] **Step 1:** Test `store.test.ts`: `set` merges the patch; `subscribe` fires once per `set`; the unsubscribe function stops notifications. Run `npx vitest run tests/store.test.ts` → FAIL. Implement it → PASS.
-- [ ] **Step 2:** Implement `processVideo` as in ARCHITECTURE.md section 4.1: seek `t = i / SAMPLE_RATE`, await `seeked`, `detectForVideo(video, Math.round(t*1000))`, map `result.landmarks[0]` to `Landmark{x,y,v: visibility}` or `null`. Apply `SWAP_LR` with `LR_PAIRS`.
-- [ ] **Step 3:** `upload.ts`: a file input sets take A (`URL.createObjectURL`). On `loadedmetadata` it sets `mode: 'processing'`, calls `processVideo`, stores `poses`, then sets `mode: 'idle'` and seeks to 0. On a video `error` event it shows `tr('error.video')` ("This video format can't be played in Chrome. Convert to MP4 (H.264).") and leaves the processing state.
-- [ ] **Step 4:** `progress.ts` renders `state.progress` as a bar while `mode === 'processing'`.
+- [ ] **Step 2:** Test `pickClimber.test.ts` (1000×1000 px). Build candidates with a helper that places a person with pelvis at (x, y) and torso length L:
+  - `[]` → `null`.
+  - One candidate, no previous pelvis → that candidate.
+  - Two candidates, no previous pelvis, torso 0.2 vs 0.1 → the 0.2 one.
+  - Two candidates with pelvis at (0.3, 0.6) and (0.7, 0.6), previous pelvis (0.32, 0.6) → the first, even if the second has the longer torso.
+  - One candidate at (0.8, 0.6), torso 0.2, previous pelvis (0.3, 0.6) (2.5 torso lengths away) → `null`.
+
+  FAIL → implement → PASS. Add the credit header (D38).
+- [ ] **Step 3:** Implement `processVideo` as in ARCHITECTURE.md section 4.1: seek `t = i / SAMPLE_RATE`, await `seeked`, `detectForVideo(video, Math.round(t*1000))`, map each `result.landmarks[k]` to `Landmark{x,y,v: visibility}`, then `pickClimber(…, prevPelvis)`. `prevPelvis` = the last chosen pelvis; reset it to `null` after 1 s with no chosen pose. Apply `SWAP_LR` with `LR_PAIRS`.
+- [ ] **Step 4:** `upload.ts`: a file input sets take A (`URL.createObjectURL`). On `loadedmetadata` it sets `mode: 'processing'`, calls `processVideo`, stores `poses`, then sets `mode: 'idle'` and seeks to 0. On a video `error` event it shows `tr('error.video')` ("This video format can't be played in Chrome. Convert to MP4 (H.264).") and leaves the processing state.
+- [ ] **Step 5:** `progress.ts` renders `state.progress` as a bar while `mode === 'processing'`.
 
 **Done:** Choosing an MP4 shows a progress bar, then `store.get().takes.A.poses.frames.length ≈ duration × 15`.
 **Check:** `npm test` passes. Manual check: upload a clip (from `samples/`, or any MP4 of a person), and in DevTools run `__store.get().takes.A.poses.frames.length` (expose `window.__store` in dev only). Upload a `.mov` HEVC file and see the error message.
@@ -176,54 +195,64 @@ Also checked by hand in task 2: a file Chrome cannot decode shows an error messa
 **Interfaces:**
 - Produces:
   - `interpolateGaps(pts: (Vec|null)[], dt: number, maxGap: number): (Vec|null)[]`. Fills a run of nulls linearly when it has points on both sides and the time between those two known samples is ≤ `maxGap` seconds.
-  - `movingAverage(pts: (Vec|null)[], window: number): (Vec|null)[]`. Centred; nulls stay null and are excluded from neighbours' means.
+  - `gaussianSmooth(pts: (Vec|null)[], sigma: number): (Vec|null)[]`. Gaussian kernel truncated at 3σ, applied **separately to each contiguous non-null run**, and renormalized over the samples that exist (no padding). Nulls stay null.
   - `limbPoint(lm: Landmark[] | null, limb: Limb): Vec | null` and `pelvis(lm): Vec | null`, landmark sets as in ARCHITECTURE.md section 4.2, dropping `v < MIN_VISIBILITY`
-  - `limbSeries(track: PoseTrack, limb: Limb): (Vec|null)[]` = limbPoint → interpolateGaps(MAX_INTERP_GAP) → movingAverage(SMOOTH_WINDOW)
+  - `limbSeries(track: PoseTrack, limb: Limb): (Vec|null)[]` = limbPoint → interpolateGaps(MAX_INTERP_GAP) → gaussianSmooth(SMOOTH_SIGMA)
   - `bodyScale(track: PoseTrack): number` (pixels), `distPx(a: Vec, b: Vec, track: PoseTrack): number`
   - Fixture: `type Keyframe = { t: number; x: number; y: number }`; `synthTrack(o: { duration: number; limbs: Partial<Record<Limb, Keyframe[]>>; missing?: [number, number][] }): PoseTrack`. It uses sampleRate 15 and videoW = videoH = 1000, with shoulders at y 0.4 and hips at y 0.6, so **S = 200 px**. Each limb is piecewise-linear between keyframes and constant outside them. All landmarks have `v = 1`, and frames inside `missing` ranges get `lm: null`.
 
 - [ ] **Step 1:** Tests:
   - `interpolateGaps` at dt 1/15 fills 2 nulls (known neighbours 0.2 s apart) linearly and leaves 6 nulls (0.47 s apart) as nulls.
-  - `movingAverage([0,0,3,0,0] as x)` → the middle value is 0.6 (3/5).
+  - `gaussianSmooth` with σ = 1 on x values `[0,0,3,0,0]` → the middle ≈ 1.208 (3 / (1 + 2·(0.6065 + 0.1353))), and the result is symmetric.
+  - `gaussianSmooth` on `[0,0,null,10,10]` → unchanged: the two runs are smoothed separately, so nothing leaks across the gap.
   - `limbPoint` for LH = the mean of 15, 17 and 19; with landmark 17 at `v=0.2` it is the mean of 15 and 19.
   - `bodyScale(synthTrack({duration: 2, limbs: {}}))` → 200.
 - [ ] **Step 2:** Run `npx vitest run tests/smoothing.test.ts tests/limbs.test.ts` → FAIL. Implement → PASS.
+
+- [ ] **Step 3:** Add the credit header (D38) to `smoothing.ts` (per-run smoothing is adapted from the repo).
 
 **Done / Check:** Both test files pass. `npm run typecheck` is clean.
 - [ ] **Commit:** `feat: limb points, gap fill, smoothing, body scale`
 
 ---
 
-### Task 7: Contact detection (30 min, TDD)
+### Task 7: Contact detection (40 min, TDD)
+
+Rules: ARCHITECTURE.md section 4.3 (D15, D16). A contact = on a hold with hysteresis **and** settled. Detection runs over the whole video; attempts are applied afterwards by `clipToAttempts`.
 
 **Files:**
-- Create: `src/analysis/contacts.ts`
+- Create: `src/analysis/contacts.ts` (with the credit header, D38)
 - Test: `tests/contacts.test.ts`
 
 **Interfaces:**
 - Consumes: task 6 functions and the `synthTrack` fixture.
 - Produces:
-  - `type AnalysisCtx = { track: PoseTrack; S: number; holds: Hold[]; attempts: Attempt[] }` (attempts already normalized, never empty)
-  - `type Segment = { limb: Limb; start: number; end: number; pos: Vec; attempt: number }`; `type AssignedSegment = Segment & { holdId: number | null }`
-  - `stillSegments(series: (Vec|null)[], limb: Limb, ctx: AnalysisCtx): Segment[]`
-  - `assignHolds(segs: Segment[], ctx: AnalysisCtx): AssignedSegment[]`
-  - `mergePlacements(segs: AssignedSegment[], series: (Vec|null)[], ctx: AnalysisCtx): Contact[]`
-  - `detectContacts(ctx: AnalysisCtx): Contact[]`: all four limbs, sorted by `start`
+  - `type AnalysisCtx = { track: PoseTrack; S: number; holds: Hold[] }`
+  - `type Run = { i0: number; i1: number }` (inclusive sample indices); `type Stay = { limb: Limb; holdId: number; i0: number; i1: number }`
+  - `stillMask(series: (Vec|null)[], ctx: AnalysisCtx): boolean[]`
+  - `stillSegments(series: (Vec|null)[], ctx: AnalysisCtx): Run[]` (still runs lasting ≥ `MIN_STILL`)
+  - `holdStays(series: (Vec|null)[], limb: Limb, ctx: AnalysisCtx): Stay[]` (hysteresis walk, as in ARCHITECTURE.md section 4.3 step 3)
+  - `confirmStays(stays: Stay[], series: (Vec|null)[], stills: Run[], ctx: AnalysisCtx): Contact[]` (with `attempt: -1`)
+  - `footSmears(series: (Vec|null)[], limb: 'LF'|'RF', stills: Run[], confirmed: Contact[], ctx: AnalysisCtx): Contact[]`
+  - `detectContacts(ctx: AnalysisCtx): Contact[]`: all four limbs over the whole video, sorted by `start`
+  - `clipToAttempts(contacts: Contact[], attempts: Attempt[]): Contact[]`
 
-- [ ] **Step 1:** Tests (S = 200 px, so still means < 0.1 normalized units/s; the hold radius is 0.12 normalized units). Times have a ±0.15 s tolerance because of smoothing:
-  - `finds two still segments around a move`: RH at (0.5, 0.3) for 0–1 s, moving to (0.5, 0.1) over 1–1.5 s, then still to 3 s → 2 segments, starting ≈ 0 and ≈ 1.5.
-  - `ignores stillness shorter than MIN_STILL`: still for 0.2 s between moves → no segment there.
-  - `splits a still run at a long missing-data gap`: still for 0–3 s with `missing: [[1, 2]]` → 2 segments.
-  - `bridges a short missing-data gap`: `missing: [[1, 1.2]]` → 1 segment.
-  - `clips segments to attempts`: attempts `[{start: 1.5, end: 3}]` → only the second segment, with `attempt: 0`.
-  - `assignHolds`: holds `{1: (0.5,0.3)}`, `{2: (0.5,0.1)}`. pos (0.5,0.41) → 1; (0.5,0.43) → null; (0.9,0.9) → null.
-  - `merges a re-settle on the same hold into one contact with a correction`: LF still at (0.5,0.3) for 0–1 s, out to (0.56,0.3) at 1.15 s, back at 1.3 s, still to 3 s → 1 contact on hold 1, `corrections.length === 1`, `corrections[0] ≈ 1.3`.
-  - `does not merge when the foot left the hold radius`: LF still on hold 1 for 0–1 s, moves to (0.5,0.1) (hold 2) by 1.3 s, still there to 1.8 s, back on hold 1 by 2.1 s, still to 3.5 s → 3 contacts with holdIds [1, 2, 1], zero corrections.
-  - `does not merge across a gap longer than CORRECTION_GAP`: re-settle after 2 s → 2 contacts.
-- [ ] **Step 2:** Run `npx vitest run tests/contacts.test.ts` → FAIL. Implement → PASS. Speed per sample = `distPx(p[i], p[i-1]) * SAMPLE_RATE / S`, and nulls are not still. If the synthetic "wiggle" is smoothed below `STILL_SPEED`, widen the wiggle in the fixture; do not change the config values.
+- [ ] **Step 1:** Tests. With S = 200 px: still means < 0.1 normalized units/s, `HOLD_RADIUS` = 0.12 and `RELEASE_RADIUS` = 0.2 normalized units. Holds: 1 at (0.5, 0.3), 2 at (0.5, 0.2). Times have a ±0.15 s tolerance:
+  - `confirms a settled contact`: RH still on hold 1 for 0–1 s → 1 contact, `holdId 1`, start ≈ 0, end ≈ 1.
+  - `ignores a pass-by`: RH moves from (0.3, 0.3) to (0.7, 0.3) over 0–1.6 s (1.25 S/s). It is inside the radius for about 1 s but never still → 0 contacts.
+  - `ignores a touch shorter than HOLD_DWELL`: RH arrives at 3 units/s, is still on hold 1 for 0.3 s, and leaves at 3 units/s → 0 contacts.
+  - `hysteresis keeps the hold through a wiggle and counts a correction`: LF still on hold 1 for 0–1 s, out to (0.66, 0.3) by 1.15 s (0.8 S: outside the enter radius, inside the release radius), back by 1.3 s, still to 3 s → 1 contact on hold 1, `corrections.length === 1`, `corrections[0] ≈ 1.3`.
+  - `leaving past RELEASE_RADIUS starts a new contact`: the same, but out to (0.76, 0.3) (1.3 S), still there for 0.5 s, then back → holdIds `[1, null, 1]` (the middle one is a smear), zero corrections.
+  - `a deeper hold wins`: RH still on hold 1 for 0–1 s, moves to hold 2 by 1.2 s, still to 2.5 s → holdIds `[1, 2]` (hold 2 is only 0.5 S from hold 1, inside the release radius, so without this rule it would stay on 1).
+  - `splits a contact at a long missing-data gap`: RH still on hold 1 for 0–3 s with `missing: [[1, 2]]` → 2 contacts.
+  - `bridges a short missing-data gap`: `missing: [[1, 1.2]]` → 1 contact.
+  - `foot smear`: LF still at (0.9, 0.9), no hold near, for 0–1 s → 1 contact with `holdId: null`.
+  - `a still hand off any hold is not a contact`: RH still at (0.9, 0.9) → 0 contacts.
+  - `clipToAttempts`: the "deeper hold" contacts with attempts `[{start: 1.5, end: 3}]` → only the hold-2 contact, start clipped to 1.5, `attempt: 0`. A contact fully outside is dropped, and so are corrections outside the clipped range.
+- [ ] **Step 2:** Run `npx vitest run tests/contacts.test.ts` → FAIL. Implement → PASS. Speed per sample = `distPx(p[i], p[i-1]) * SAMPLE_RATE / S`, and nulls are not still. If smoothing pulls a synthetic wiggle below `STILL_SPEED`, make the wiggle faster in the fixture; do not change the config values.
 
 **Done / Check:** All contact tests pass. `npm test` is green.
-- [ ] **Commit:** `feat: contact detection with hold assignment and placement merge`
+- [ ] **Commit:** `feat: contact detection with hysteresis, dwell and stillness`
 
 ---
 
@@ -237,14 +266,14 @@ Also checked by hand in task 2: a file Chrome cannot decode shows an error messa
 **Interfaces:**
 - Produces:
   - `computeMetrics(contacts: Contact[], attempts: Attempt[]): Metrics`. `touches` counts contacts per limb. `footCorrections` sums `corrections.length` for LF and RF. `attempts` and `rests` are filled in task 10 (until then: one attempt, no rests).
-  - `analyzeTake(take: Take): { contacts: Contact[]; metrics: Metrics }`. It returns empty results when `poses` is null.
+  - `analyzeTake(take: Take): { contacts: Contact[]; metrics: Metrics; attempts: Attempt[] }`. It returns empty results when `poses` is null. Chain: `detectContacts` → attempts (until tasks 10/10b: `[{start: 0, end: duration}]`) → `clipToAttempts` → `computeMetrics`. The full chain is in ARCHITECTURE.md section 4.3.
   - Layers `contacts` (en "Limb contacts", he "מגע גפיים") and `touches` (en "Touch count", he "מספר מגעים", metrics only, no `draw`).
   - Limb colours: LH `#4fc3f7`, RH `#1565c0`, LF `#ffb74d`, RF `#e65100` (left = lighter).
 
 - [ ] **Step 1:** Tests:
   - `computeMetrics` on hand-built contacts (2 LH, 3 RH, 1 LF with 2 corrections, 2 RF with 1) → touches `{LH:2,RH:3,LF:1,RF:2,total:8}`, footCorrections `{LF:2,RF:1,total:3}`.
-  - `analyzeTake reflects changed holds`: synthetic take with the RH still at hold 1's position; removing that hold changes the contact's `holdId` from 1 to null.
-  - `zero holds gives null holdIds`: all contacts have `holdId === null` and there is no exception.
+  - `analyzeTake reflects changed holds`: synthetic take with the LF still at hold 1's position; removing that hold changes the contact's `holdId` from 1 to null (a smear).
+  - `zero holds gives null holdIds`: there are no hand contacts, the foot contacts are smears with `holdId === null`, and there is no exception.
 - [ ] **Step 2:** FAIL → implement → PASS.
 - [ ] **Step 3:** The `contacts` layer draws a limb-coloured ring with its label ("RH 2") at `pos` while `start ≤ t ≤ end`. The `contactList` shows `mm:ss LIMB → hold N` (or "→ no hold"); clicking a row seeks the video to `start`. The `metricsPanel` shows the rows of enabled layers.
 
@@ -292,11 +321,40 @@ Also checked by hand in task 2: a file Chrome cannot decode shows an error messa
   - Metrics with attempts `[{0,20},{50,80}]` → durations [20, 30], rests [30].
   - `restAt` at t=30 → 10; at t=60 → null.
 - [ ] **Step 2:** FAIL → implement → PASS.
-- [ ] **Step 3:** Buttons "Attempt start" and "Attempt end" use `video.currentTime`. A start without an end is shown as pending and is ignored by analysis. A "Clear attempts" button. The timeline is a full-width bar with attempt bands (coloured), rest bands (grey) and the playhead, plus the marks from every enabled layer's `timelineMarks()` (ARCHITECTURE.md section 5, D32). Add `timelineMarks` to the `contacts` entry (limb-coloured ticks at each `start`) and to the `footCorrections` entry (a tick at each correction). Clicking seeks.
+- [ ] **Step 3:** Buttons "Attempt start" and "Attempt end" use `video.currentTime` and set `attemptsSource: 'manual'`; the first manual mark replaces any automatic attempts (task 10b). A start without an end is shown as pending and is ignored by analysis. A "Clear attempts" button. The timeline is a full-width bar with attempt bands (coloured), rest bands (grey) and the playhead, plus the marks from every enabled layer's `timelineMarks()` (ARCHITECTURE.md section 5, D32). Add `timelineMarks` to the `contacts` entry (limb-coloured ticks at each `start`) and to the `footCorrections` entry (a tick at each correction). Clicking seeks.
 
 **Done:** With two attempts marked, the panel shows each duration and the rest, and the rest timer counts up while playing through the rest.
 **Check:** `npm test` is green, plus the manual check: the timeline ticks line up with the contact list times.
 - [ ] **Commit:** `feat: manual attempts, timeline, duration and rest metrics`
+
+---
+
+### Task 10b: Automatic attempt start and end (25 min, TDD)
+
+Added by Tal (D37). Rules: ARCHITECTURE.md section 4.6.
+
+**Files:**
+- Create: `src/analysis/autoAttempts.ts` (with the credit header, D38)
+- Modify: `src/analysis/analyzeTake.ts`, `src/ui/attemptMarker.ts`, `src/ui/timeline.ts`, `src/ui/i18n.ts`
+- Test: `tests/autoAttempts.test.ts`
+
+**Interfaces:**
+- Consumes: `detectContacts`, `clipToAttempts` (task 7), `normalizeAttempts` (task 10)
+- Produces: `detectAttempts(contacts: Contact[], holds: Hold[], track: PoseTrack): Attempt[]`. It takes the **unclipped** contacts and uses only those with a non-null `holdId`; `track` supplies the sample times. `analyzeTake` uses it when `attemptsSource === 'auto'`.
+
+- [ ] **Step 1:** Tests use hand-built contacts and a `synthTrack` used only for its sample times (15/s). Holds: 1 (0.5, 0.8) and 2 (0.6, 0.8) are footholds, 3 (0.5, 0.5) is a handhold, 9 (0.5, 0.1) is the top. Tolerance ±0.1 s.
+  - `detects a topped-out attempt`: LF on 1 and RF on 2 for 2–12 s, RH on 3 for 2–9 s, then LH and RH both on 9 from 10 s → `[{start ≈ 2, end ≈ 10.5}]`.
+  - `ends at a fall`: the same start, but every contact ends at 6 s → `end ≈ 6`.
+  - `finds two attempts`: a fall at 6 s, then the same start pattern at 20 s and a top-out from 28 s → 2 attempts, the second `{≈ 20, ≈ 28.5}`.
+  - `leaky start survives a one-sample miss`: RF's contact is split into 2–2.2 s and 2.27–12 s → start still ≈ 2.
+  - `no start detected gives []`: hand contacts only → `[]`.
+  - `analyzeTake respects the source`: `attemptsSource: 'manual'` with attempts `[{0, 5}]` → the returned attempts are `[{0, 5}]`; `'auto'` → the detected ones.
+- [ ] **Step 2:** FAIL → implement → PASS.
+- [ ] **Step 3:** UI: once holds are marked, the timeline shows automatic attempts with a dashed outline and an "Auto" badge (en "Auto", he "אוטומטי"). An "Auto-detect" button sets `attemptsSource: 'auto'`. The manual buttons switch to manual (task 10).
+
+**Done:** On a real clip with every hold clicked (Q14), attempt bands appear without pressing anything, the durations look right, and manual marks override them.
+**Check:** `npm test` is green, plus a manual check on a clip with a fall and a top-out.
+- [ ] **Commit:** `feat: automatic attempt start and end`
 
 ---
 
@@ -397,7 +455,7 @@ keep the longest subsequence strictly increasing in a (O(n²) DP is fine, n < 50
 **Files:** `src/config.ts` (tuning only), OPEN_QUESTIONS.md (findings)
 
 - [ ] **Step 1:** Follow the SPEC.md section 11 demo script steps 1–4 on the two pre-recorded takes, in a fresh Chrome window with Wi-Fi off.
-- [ ] **Step 2:** If the contact counts are clearly off, tune `STILL_SPEED`, `MIN_STILL` and `HOLD_RADIUS` against the exported `poses.json` and re-run `npm test` (the tests must stay green).
+- [ ] **Step 2:** If the contact counts are clearly off, tune `HOLD_RADIUS`, `RELEASE_RADIUS`, `HOLD_DWELL`, `STILL_SPEED` and `MIN_STILL` against the exported `poses.json`. If the automatic attempts are off, tune `START_DWELL`, `TOP_DWELL` and `END_GAP`. Re-run `npm test` (the tests must stay green).
 - [ ] **Step 3:** `npm run build && npx vite preview`, then repeat step 1 on the built app.
 
 **Done:** The whole demo script runs offline without errors in the console.
@@ -422,6 +480,6 @@ Each task: a pure function in `src/analysis/` with a Vitest test on `synthTrack`
 
 ## Self-review notes
 
-- **Spec coverage:** every SPEC.md section 4 Tier 1 row maps to a task (stick figure 3; holds and markers 5, 7, 8; touch count 8; foot corrections 7, 9; duration and rest 10; comparison 11–13). Section 3 contact sequence → 8. Section 5 → 11–13. Section 6 L/R check → 4. Section 10 UI → 1, 3, 10, 14. Section 11 demo → 15. Tier 2 → 16–20. Section 7 → nothing, as intended.
+- **Spec coverage:** every SPEC.md section 4 Tier 1 row maps to a task (stick figure 3; holds and markers 5, 7, 8; touch count 8; foot corrections 7, 9; duration and rest 10, plus automatic start/end 10b (added by Tal, D37); comparison 11–13). Section 3 contact sequence → 8. Section 5 → 11–13. Section 6 L/R check → 4. Section 10 UI → 1, 3, 10, 14. Section 11 demo → 15. Tier 2 → 16–20. Section 7 → nothing, as intended.
 - **Type consistency:** `AnalysisCtx`, `Contact`, `Metrics`, `Anchor`, `DiffRow` and `LayerDef` are each defined once (ARCHITECTURE.md section 3 or the owning task's Interfaces) and used under the same names afterwards.
-- **Estimates:** Tier 1 = 15+25+20+10+15+15+30+25+15+25+15+20+25+10+10 = 275 min ≈ 4 h 35 min. Tier 2 ≈ 1 h 45 min.
+- **Estimates:** Tier 1 = 15+35+20+10+15+15+40+25+15+25+25 (10b)+15+20+25+10+10 = 320 min ≈ 5 h 20 min. Tier 2 ≈ 1 h 45 min.

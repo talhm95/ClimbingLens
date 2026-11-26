@@ -11,7 +11,10 @@ the same route, aligned by hold. Built for a hackathon (Israel Climbing Federati
   something seems missing, add it to `OPEN_QUESTIONS.md` instead of building it.
 - `ARCHITECTURE.md`: components, data flow, types, where each metric is computed.
 - `PLAN.md`: ordered tasks with done and check criteria. Work through it in order.
-- `DECISIONS.md`: decisions already made (D#). Do not reopen them silently.
+- `DECISIONS.md`: decisions already made (D#). Do not reopen them silently. Scope changes Tal
+  approved after SPEC.md was written are recorded here (for example, automatic attempts, D37).
+- `CREDITS.md`: logic adapted from `jeremyipark/vision-demos` (Apache-2.0). Every adapted
+  file starts with the credit header from D38.
 - `OPEN_QUESTIONS.md`: questions waiting on Tal (Q#).
 
 ## Stack

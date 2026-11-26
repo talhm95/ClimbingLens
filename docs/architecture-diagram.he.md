@@ -24,7 +24,7 @@ flowchart TB
         direction LR
         U1["Upload video<br/>take A, then take B"]
         U2["Click holds<br/>on first frame"]
-        U3["Attempt start / end"]
+        U3["Attempt start / end<br/>(manual override)"]
         U4["Checklist toggles"]
         U5["EN / HE"]
     end
@@ -36,7 +36,7 @@ flowchart TB
     end
 
     subgraph POSE["src/pose"]
-        P1["processVideo()<br/>seek every 1/15 s<br/>PoseLandmarker.detectForVideo()"]
+        P1["processVideo()<br/>seek every 1/15 s<br/>PoseLandmarker.detectForVideo()<br/>pickClimber() of 2 candidates"]
     end
 
     subgraph STATE["src/state/store.ts"]
@@ -48,12 +48,15 @@ flowchart TB
     subgraph ANALYSIS["src/analysis (pure functions, unit-tested)"]
         AT["analyzeTake()"]
         LB["limbs + smoothing<br/>limbSeries, bodyScale S"]
-        CT1["contacts<br/>stillSegments, assignHolds,<br/>mergePlacements"]
+        CT1["contacts<br/>holdStays, confirmStays,<br/>footSmears"]
+        AA["autoAttempts<br/>detectAttempts"]
+        CLIP["clipToAttempts"]
         MT["metrics<br/>normalizeAttempts, computeMetrics"]
         T2["Tier 2<br/>heatmap, drops, jump,<br/>weightShift, angles"]
         AL["alignment<br/>buildAnchors, timeMap"]
         CMP["compare<br/>diffMetrics"]
-        AT --> LB --> CT1 --> MT
+        AT --> LB --> CT1 --> AA --> CLIP --> MT
+        CT1 --> CLIP
         LB --> T2
         CT1 --> T2
     end
@@ -88,7 +91,7 @@ flowchart TB
     U5 --> I18N --> S2
 
     S1 -- "on change" --> AT
-    MT -- "contacts, metrics" --> S1
+    MT -- "contacts, metrics, attempts" --> S1
     T2 -- "tier2 results" --> S1
 
     S1 -- "A and B" --> AL --> CMP --> CTB
@@ -103,7 +106,7 @@ flowchart TB
     S1 --> MP
 
     class S1,S2 store
-    class AT,LB,CT1,MT,AL,CMP pure
+    class AT,LB,CT1,AA,CLIP,MT,AL,CMP pure
     class T2,LT2 tier2
 ```
 
@@ -118,16 +121,21 @@ flowchart TB
 **2. קבצים מקומיים (<bdi>public</bdi>).** מודל MediaPipe וקובצי ה-WASM מועתקים למחשב פעם אחת, בפקודה <bdi>npm run setup</bdi>. מאותו רגע האפליקציה עובדת גם בלי אינטרנט, וזה חשוב ביום ההדגמה (D9).
 
 **3. זיהוי תנוחה (<bdi>pose</bdi>).** מיד אחרי ההעלאה, הפונקציה <bdi>processVideo</bdi> עוברת על הסרטון בקפיצות של <bdi>1/15</bdi> שנייה. בכל פריים היא מריצה את המודל ושומרת 33 נקודות גוף. התוצאה נשמרת כ-<bdi>PoseTrack</bdi>. העיבוד רץ פעם אחת בלבד, ובזמן הניגון המודל לא רץ בכלל (D11).
+המודל מזהה עד שני אנשים בכל פריים, והפונקציה <bdi>pickClimber</bdi> בוחרת את מי שהכי קרוב למקום של המטפס בפריים הקודם. כך מי שעובר בפריים לא "גונב" את השלד (D36).
 
 **4. מצב האפליקציה (<bdi>store</bdi>).** זה מקור אמת יחיד. הוא שומר את שני הניסיונות, A ו-B, עם כל הנתונים של כל אחד. הוא שומר גם אילו שכבות מסומנות, את השפה ואת המצב הנוכחי. כל רכיבי הממשק מאזינים לשינויים בו ומציירים את עצמם מחדש.
 
 **5. ניתוח (<bdi>analysis</bdi>).** אלה פונקציות טהורות: הן מקבלות מערכים ומחזירות מערכים, בלי DOM ובלי MediaPipe, ולכן קל לבדוק אותן. השרשרת:
-- **נקודת גפה:** נקודת היד היא ממוצע של שורש כף היד, האצבע והזרת. נקודת הרגל היא ממוצע של העקב והבוהן. אחר כך ממלאים פערים קצרים ומחליקים את התנועה (D14, D17).
-- **מגע:** פרק זמן של 0.3 שנייה לפחות שבו הגפה כמעט לא זזה. כל מגע משויך לאחיזה הקרובה אליו, אם היא בתוך הרדיוס (D15).
-- **תיקון רגל:** הרגל זזה ונחה שוב על אותה אחיזה בלי לעזוב אותה. תיקון נספר בנפרד, ולא כמגע נוסף (D16).
+- **נקודת גפה:** נקודת היד היא ממוצע של שורש כף היד, האצבע והזרת. נקודת הרגל היא ממוצע של העקב והבוהן. אחר כך ממלאים פערים קצרים ומחילים החלקה קלה על התנועה, בנפרד בכל קטע רציף, כך שההחלקה לא "מציירת" תנועה מעל פער (D14, D17).
+- **מגע:** צריך שני תנאים. הראשון: הגפה **על אחיזה** חצי שנייה לפחות. השני: היא **נחה** שם 0.3 שנייה לפחות. כדי להיכנס לאחיזה הגפה צריכה להתקרב אליה מאוד, וכדי לעזוב אותה היא צריכה להתרחק יותר. כך רעידות קטנות של הזיהוי לא נספרות כעזיבה וחזרה (D15).
+- **למה שני תנאים:** תנאי המיקום לבדו סופר גפה שרק עוברת ליד אחיזה. תנאי המנוחה לבדו סופר יד שטובלת בשקית המגנזיום. יחד הם מבטלים את שתי הטעויות.
+- **תיקון רגל:** הרגל זזה ונחה שוב על אותה אחיזה בלי לעזוב אותה. תיקון נספר בנפרד, ולא כמגע נוסף (D16). רגל שנחה על הקיר בלי אחיזה נספרת כמגע מסוג "מריחה" (smear), אבל יד שנחה בלי אחיזה לא נספרת כמגע.
+- **ניסיונות אוטומטיים:** ניסיון מתחיל כששתי הרגליים ויד אחת על אחיזות במשך 0.4 שנייה. הוא נגמר כששתי הידיים על האחיזה הגבוהה ביותר במשך חצי שנייה, או כשאף גפה לא על אחיזה במשך שנייה (נפילה). סימון ידני גובר על הזיהוי האוטומטי (D37).
 - **מדדים:** מספר המגעים של כל גפה, מספר תיקוני הרגל, משך כל ניסיון ומשך כל מנוחה.
 
 הניתוח רץ מחדש תוך אלפיות שנייה, בכל פעם שמוסיפים אחיזה או מסמנים ניסיון. אין צורך לעבד את הסרטון מחדש.
+
+חלק מכללי המגע, ההחלקה והניסיונות מבוססים על הקוד של הריפו <bdi>jeremyipark/vision-demos</bdi> (רישיון <bdi>Apache-2.0</bdi>). הם נכתבו מחדש ב-TypeScript, והקרדיט מופיע בקובץ <bdi>CREDITS.md</bdi> (D38).
 
 **6. שכבות ותצוגה (<bdi>overlay</bdi>).** רשימה אחת, <bdi>LAYERS</bdi>, מגדירה את כל השכבות. מכל שכבה ברשימה נוצרת שורה ברשימת הסימון. לכל שכבה יש עד שלוש נקודות חיבור:
 - ציור על הווידאו (<bdi>draw</bdi>)
@@ -163,9 +171,11 @@ sequenceDiagram
     Coach->>UI: Mark holds (click 1, 2, 3 ...)
     UI->>Store: takes.A.holds
     Store->>An: analyzeTake(A)
-    An-->>Store: contacts, metrics
-    Coach->>UI: Attempt start / Attempt end
-    UI->>Store: takes.A.attempts
+    An-->>Store: contacts, metrics, auto-detected attempts
+    opt manual override
+        Coach->>UI: Attempt start / Attempt end
+        UI->>Store: takes.A.attempts, source = manual
+    end
     Store->>An: analyzeTake(A) again, no re-processing
     An-->>Store: contacts, metrics
     Coach->>UI: Play, toggle checklist
@@ -193,7 +203,7 @@ sequenceDiagram
 
 1. **העלאת ניסיון A.** מופיע פס התקדמות בזמן העיבוד. סרטון של דקה אמור להיות מוכן תוך פחות מדקה. זו ההגדרה של "זמן אמת" בפיץ': המשוב מוכן לפני הניסיון הבא.
 2. **סימון אחיזות.** המאמן לוחץ על האחיזות לפי הסדר. כל לחיצה מפעילה מחדש את הניתוח, ורשימת המגעים מתעדכנת מיד.
-3. **סימון ניסיונות.** בכפתורי "תחילת ניסיון" ו"סוף ניסיון" מסמנים קטעים. הפערים בין הקטעים הם המנוחות. המגעים נספרים רק בתוך ניסיונות.
+3. **ניסיונות.** אחרי סימון האחיזות, המערכת מזהה לבד מתי כל ניסיון מתחיל ונגמר, ומציגה אותם על ציר הזמן במסגרת מקווקוות. אם הזיהוי טועה, המאמן מסמן ידנית בכפתורי "תחילת ניסיון" ו"סוף ניסיון", והסימון הידני מחליף את האוטומטי. הפערים בין הניסיונות הם המנוחות, והמגעים נספרים רק בתוך ניסיונות.
 4. **ניגון.** בכל פריים לולאת הציור קוראת את המצב לפי זמן הווידאו ומציירת רק את השכבות המסומנות.
 5. **ניסיון B.** הוא מקבל את האחיזות של A, עובר עיבוד וניתוח, ואז נבנים העוגנים ליישור הזמן.
 6. **השוואה.** בזמן ש-B מתנגן מוצגים שלושה דברים: מסלול האגן של B בצבע, המסלול המלא של A באפור, ונקודה אפורה במקום שבו היה האגן של A באותו "שלב" של המסלול. מתחת לווידאו מופיעה טבלת הפרשים, למשל "תיקוני רגל: 6 ← 2".
@@ -220,6 +230,7 @@ classDiagram
         +poses PoseTrack
         +holds Hold[]
         +attempts Attempt[]
+        +attemptsSource auto or manual
         +contacts Contact[]
         +metrics Metrics
         +tier2 Tier2Results, optional
@@ -313,7 +324,7 @@ classDiagram
 | מספרי אחיזות וסימוני מגע | 1 | <bdi>ui/holdMarker.ts</bdi>, <bdi>analysis/contacts.ts</bdi> | שכבות <bdi>holds</bdi> ו-<bdi>contacts</bdi>, רשימת מגעים, ציר זמן |
 | מספר מגעים | 1 | <bdi>analysis/metrics.ts</bdi> | לוח מדדים |
 | תיקוני רגל | 1 | <bdi>analysis/contacts.ts</bdi>, <bdi>metrics.ts</bdi> | נקודה מהבהבת על הרגל, לוח מדדים |
-| משך ניסיון ומנוחה | 1 | <bdi>analysis/metrics.ts</bdi> | ציר זמן, שעון מנוחה |
+| משך ניסיון ומנוחה | 1 | <bdi>analysis/autoAttempts.ts</bdi> (או סימון ידני), <bdi>metrics.ts</bdi> | ציר זמן, שעון מנוחה |
 | השוואת שני ניסיונות | 1 | <bdi>analysis/alignment.ts</bdi>, <bdi>compare.ts</bdi> | שכבת <bdi>comparison</bdi>, טבלת הפרשים |
 | מפת חום של הרגליים | 2 | <bdi>analysis/heatmap.ts</bdi> | שכבת <bdi>heatmap</bdi> |
 | העברת משקל | 2 | <bdi>analysis/weightShift.ts</bdi> | קו אנכי מהאגן, אדום כשיוצא מהטווח |

@@ -113,38 +113,43 @@ Gaps up to 0.3 s are linearly interpolated; longer gaps break segments.
 **Why:** The wrist alone sits a palm's length off the hold. In back view the toe is
 often hidden, so averaging with the heel is steadier. The values are in `src/config.ts` to tune.
 
-**D15. Q:** What is a "contact"?
-**A:** A limb is *still* while its smoothed speed is < 0.5 S/s. Each still run
-lasting ≥ 0.3 s is a **still segment**. A segment is assigned to the nearest hold
-within 0.6 S of the segment's median position, otherwise `holdId: null`
-("no hold": smear or wall). Contacts are counted only inside marked attempts
-(the whole video if none are marked).
-**Why:** SPEC.md section 4 ("each still segment of a limb = one contact"). The numbers
-are first guesses, collected in `config.ts` and tuned on a real clip in plan task 6.
+**D15. Q:** What is a "contact"? *(Revised 2026-11-26 after the reference-repo review; Tal approved.)*
+**A:** A contact needs both **where** and **still**. The limb stays on a hold with
+**hysteresis**: it enters within 0.6 S of the hold and keeps the hold until it is more than
+1.0 S away, unless another hold it is closer to takes over. The stay must last ≥ 0.5 s
+**and** include a still run (speed < 0.5 S/s) of ≥ 0.3 s. A still foot on no hold is
+a smear contact (`holdId: null`). A still hand on no hold is not a contact. Contacts are found
+over the whole video, then clipped to attempts. Details: ARCHITECTURE.md section 4.3.
+**Why:** The first version ("each still segment = one contact, then the nearest hold") counted a hand
+in the chalk bag as a contact, and broke one grip into pieces whenever pose jitter crossed a
+single boundary. The reference repo (`rock_climbing/src/climb.py`) solved jitter with two
+margins and dwell, but then needed a separate "graze" rule for limbs passing a hold.
+Requiring stillness as well removes grazes without that rule. The 0.6 → 1.0 ratio follows its
+0.58 → 0.96 hold-height margins; we use body scale because clicked holds have no size.
 
 **D16. Q:** Does a foot correction also count as an extra touch?
-**A:** No. Still segments of the **same foot on the same hold** are merged into one
-**placement** when the movement between them is ≤ 1.5 s long and never leaves the hold
-radius. Each extra segment inside a placement is one **correction**. Touch
-count = number of placements.
-**Why:** Otherwise one jittery foot inflates both metrics at once and the
-touch count stops meaning "holds used". Hands get the same merge, so a hand
-re-grip on the same hold is not a new touch either (hand re-grips are not shown
-as a metric). Confirm with the coach: OPEN_QUESTIONS Q5.
+**A:** No. A correction = a 2nd, 3rd, … still run inside **one** contact: the foot moved and
+re-settled without leaving the release radius. Touch count = number of contacts.
+Leaving past the release radius and coming back is a new contact. (The 1.5 s
+`CORRECTION_GAP` from the first version is gone: hysteresis replaces it.)
+**Why:** Otherwise one jittery foot inflates both metrics at once. The reference repo
+makes the same call ("a grip settling, not a move"). Confirm with the coach: Q5.
 
-**D17. Q:** Smoothing method?
-**A:** A centred moving average over 5 samples (about 0.33 s at 15/s), applied to
-limb points before the speed is computed.
-**Why:** Processing is offline, so a non-causal filter is fine and simpler than a
-One-Euro filter.
+**D17. Q:** Smoothing method? *(Revised 2026-11-26.)*
+**A:** A Gaussian with σ = 1 sample (about 0.07 s at 15/s), applied **separately on each
+contiguous run** of non-null samples, after filling short gaps.
+**Why:** The first choice (a 5-sample average, about 0.33 s) was too heavy and would blur fast moves.
+The reference repo uses about 0.07 s and smooths per run, so a limb that disappears and
+reappears elsewhere is not drawn travelling between the two.
 
-**D18. Q:** How are attempts and rests marked?
-**A:** Manually. Buttons set "attempt start" and "attempt end" at the current
-playhead. One video can hold several attempts. Rests = gaps between
-consecutive attempts. The rest timer counts up while the playhead is inside a
-rest. If no attempt is marked, the whole video is one attempt.
-**Why:** SPEC.md section 4 Tier 1 ("manual trim"). Automatic cutting is a stretch goal and is
-out.
+**D18. Q:** How are attempts and rests marked? *(Revised 2026-11-26: Tal added automatic start/end.)*
+**A:** **Automatic by default, manual override.** Once holds are marked, `detectAttempts`
+finds each attempt (D37). The "Attempt start" / "Attempt end" buttons switch the take to manual
+marks, and "Auto-detect" switches back. One video can hold several attempts. Rests = gaps between
+attempts. The rest timer counts up inside a rest. If nothing is detected or marked, the whole video is
+one attempt.
+**Why:** Tal asked for automatic attempt start and end, so SPEC.md's "stretch" item is now in scope.
+Manual stays as the fallback, because SPEC.md section 6 warns about dead time and messy footage.
 
 ## Comparison
 
@@ -260,3 +265,34 @@ sharp.
 **A:** The whole take (all attempts), as a static watermark.
 **Why:** SPEC.md calls it a watermark of where feet stood. A static map is simpler and is
 computed once per analysis.
+
+## Reference-repo review (added 2026-11-26; Tal approved the changes)
+
+Claude read `jeremyipark/vision-demos/rock_climbing` (README, `route-reading-explained.md`,
+`config.py`, `src/climb.py`, `src/compare.py`, `src/pose.py`). None of it was run. D15–D18
+were revised from it. Items that were not adopted are in OPEN_QUESTIONS Q12–Q13.
+
+**D36. Q:** What if someone walks through the frame?
+**A:** Detect up to 2 people per frame (`numPoses: 2`). `pickClimber` keeps the one whose pelvis
+is closest to the previous chosen pelvis (within 1.5 S). With no previous pelvis, it keeps the
+longest torso. If no candidate is close, the frame is `null`. ARCHITECTURE.md section 4.1.
+**Why:** SPEC.md section 6 notes passers-by. With `numPoses: 1`, MediaPipe could silently track
+the wrong person. The reference repo locks onto the person who overlaps the wall; we don't know the
+holds at processing time, so we use continuity instead.
+
+**D37. Q:** How does automatic attempt start/end work? *(Given by Tal: "add automatic attempt start and end".)*
+**A:** Start = both feet on holds and a hand on a hold, for 0.4 s, counted leakily and
+backdated. End = both hands on the highest hold for 0.5 s (top-out), or no limb on any hold
+for 1.0 s (fall). There is no floor detection. ARCHITECTURE.md section 4.6. It is in Tier 1 as PLAN task 10b.
+**Why:** The rules are adapted from the reference repo. Its floor-line start needs SAM floor
+segmentation, so we use its fallback rule for when no floor is available. The leaky count is the
+repo's fix for a clock that started 7 s late.
+
+**D38. Q:** How do we credit the reference repo?
+**A:** A `CREDITS.md` at the root names the repo, its Apache-2.0 licence, and what was adapted
+(contact hysteresis and dwell, "a deeper hold wins", per-run smoothing, attempt start/top-out
+rules, the merge rule behind corrections). Every adapted file starts with:
+`// Adapted from jeremyipark/vision-demos rock_climbing (Apache-2.0). See CREDITS.md.`
+Nothing is copied verbatim. The logic is re-implemented in TypeScript.
+**Why:** SPEC.md section 8: keep the licence notice, credit the source, and say in the pitch what was reused.
+Whether hackathon rules allow reuse is still open (SPEC.md section 12).
