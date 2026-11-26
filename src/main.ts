@@ -1,9 +1,14 @@
 import './styles.css';
+import { startRenderLoop } from './overlay/renderLoop';
+import { startAnalysisRunner } from './state/analysisRunner';
 import { createStore } from './state/store';
 import type { AppState, LayerId } from './types';
-import { startRenderLoop } from './overlay/renderLoop';
 import { renderChecklist } from './ui/checklist';
+import { renderContactList } from './ui/contactList';
+import { mountDebug } from './ui/debug';
+import { renderHoldMarker } from './ui/holdMarker';
 import { tr } from './ui/i18n';
+import { renderMetricsPanel } from './ui/metricsPanel';
 import { renderProgress } from './ui/progress';
 import { fileButton, loadTake } from './ui/upload';
 
@@ -23,22 +28,29 @@ if (import.meta.env.DEV) (window as unknown as { __store: typeof store }).__stor
 
 const video = document.getElementById('video') as HTMLVideoElement;
 const header = document.getElementById('header')!;
+const canvas = document.getElementById('overlay') as HTMLCanvasElement;
 
 function renderHeader() {
   header.replaceChildren();
   const h1 = document.createElement('h1');
   h1.textContent = tr('app.title');
   header.append(h1, fileButton(tr('upload.takeA'), (f) => loadTake(store, video, 'A', f)));
+  mountDebug(header, store);
 }
 
 const sidebar = document.getElementById('sidebar')!;
 const checklistEl = document.createElement('div');
-sidebar.append(checklistEl);
+const holdsEl = document.createElement('div');
+sidebar.append(checklistEl, holdsEl);
 
+startAnalysisRunner(store);
 renderHeader();
 renderProgress(document.getElementById('progress')!, store);
 renderChecklist(checklistEl, store);
-startRenderLoop(video, document.getElementById('overlay') as HTMLCanvasElement, store);
+renderHoldMarker(holdsEl, store, video, canvas);
+renderMetricsPanel(document.getElementById('metrics')!, store);
+renderContactList(document.getElementById('contacts')!, store, video);
+startRenderLoop(video, canvas, store);
 store.subscribe((s) => {
   video.controls = s.mode !== 'processing';
 });

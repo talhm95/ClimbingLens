@@ -12,6 +12,22 @@ const en: Record<string, string> = {
   'empty.noVideo': 'Load a back-view tripod video to start.',
   'checklist.title': 'Layers',
   'checklist.tier2': 'Tier 2',
+  'holds.title': 'Holds',
+  'holds.mark': 'Mark holds',
+  'holds.done': 'Done',
+  'holds.undo': 'Undo',
+  'holds.clear': 'Clear',
+  'holds.hint': 'Click each hold on the video, in route order (footholds too).',
+  'holds.count': 'Holds marked:',
+  'contacts.title': 'Contact sequence',
+  'contacts.off': 'Turn on "Limb contacts" to see the sequence.',
+  'contacts.none': 'No contacts found.',
+  'contacts.markHolds': 'Mark the holds to see which limb touched which hold.',
+  'contacts.toHold': '→ hold',
+  'contacts.noHold': '→ no hold',
+  'contacts.corrections': 'corrections:',
+  'metrics.title': 'Metrics',
+  'metrics.total': 'Total',
 };
 
 const he: Record<string, string> = {};
