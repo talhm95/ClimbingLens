@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bodyScale, distPx, limbPoint, limbSeries, pelvis } from '../src/analysis/limbs';
+import { bodyScale, breakJumps, distPx, limbPoint, limbSeries, pelvis } from '../src/analysis/limbs';
 import type { Landmark } from '../src/types';
 import { still, synthTrack } from './fixtures/synth';
 
@@ -62,5 +62,16 @@ describe('limbSeries', () => {
     expect(s[8]).not.toBeNull(); // t = 0.53, inside the short gap
     expect(s[30]).toBeNull(); // t = 2.0, inside the long gap
     expect(s[8]!.x).toBeCloseTo(0.5, 9);
+  });
+});
+
+describe('breakJumps', () => {
+  it('breaks a path where one sample jumps further than maxS body scales', () => {
+    const track = { sampleRate: 15, videoW: 1000, videoH: 1000, frames: [] };
+    const pts = [{ x: 0.5, y: 0.5 }, { x: 0.51, y: 0.5 }, { x: 0.9, y: 0.9 }, { x: 0.91, y: 0.9 }];
+    const out = breakJumps(pts, track, 200, 1.5);
+    expect(out[1]).not.toBeNull();
+    expect(out[2]).toBeNull();
+    expect(out[3]).not.toBeNull();
   });
 });

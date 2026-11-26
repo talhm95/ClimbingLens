@@ -61,6 +61,17 @@ export function pelvisSeries(track: PoseTrack): (Vec | null)[] {
   return gaussianSmooth(interpolateGaps(raw, 1 / track.sampleRate, MAX_INTERP_GAP), SMOOTH_SIGMA);
 }
 
+/**
+ * For drawing a path: replace a sample with null where it is more than maxS body scales from the
+ * previous one (a physically impossible step, i.e. the tracked person switched), so the line breaks.
+ */
+export function breakJumps(pts: (Vec | null)[], track: Pick<PoseTrack, 'videoW' | 'videoH'>, S: number, maxS: number): (Vec | null)[] {
+  return pts.map((p, i) => {
+    const q = i > 0 ? pts[i - 1] : null;
+    return p && q && distPx(p, q, track) / S > maxS ? null : p;
+  });
+}
+
 export function distPx(a: Vec, b: Vec, track: Pick<PoseTrack, 'videoW' | 'videoH'>): number {
   return Math.hypot((a.x - b.x) * track.videoW, (a.y - b.y) * track.videoH);
 }

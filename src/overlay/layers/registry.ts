@@ -2,6 +2,7 @@
 import { activeTake } from '../../state/selectors';
 import type { AppState, LayerDef } from '../../types';
 import { tr } from '../../ui/i18n';
+import { drawComparison } from './comparison';
 import { contactMarks, drawContacts } from './contacts';
 import { correctionMarks, correctionRows, drawCorrections } from './corrections';
 import { drawHolds } from './holds';
@@ -43,6 +44,7 @@ export const LAYERS: LayerDef[] = [
     timelineMarks: correctionMarks,
   },
   { id: 'timing', tier: 1, label: { en: 'Attempt & rest time', he: 'זמן ניסיון ומנוחה' }, needs: ['poses'], metrics: timingRows },
+  { id: 'comparison', tier: 1, label: { en: 'Compare with take A', he: 'השוואה לניסיון A' }, needs: ['takeB'], draw: drawComparison },
 ];
 
 /** A layer is available once everything in its `needs` exists. */

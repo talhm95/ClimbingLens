@@ -7,6 +7,7 @@ export const NUM_POSES = 3;           // candidates per frame (D36; 3 so spectat
 export const CLIMBER_MAX_JUMP = 1.5;  // body scales between frames (D36)
 export const CLIMBER_RESET = 1.0;     // s without a match before a person's tracklet ends (D36, D39)
 export const CLIMBER_MIN_SPEED = 0.15; // torso lengths / s averaged over a tracklet; slower = spectator (D39)
+export const PATH_BREAK = 1.5;        // body scales between two samples: a drawn path breaks there (person switch)
 export const MIN_VISIBILITY = 0.5;    // D14
 export const MAX_INTERP_GAP = 0.3;    // s (D14)
 export const SMOOTH_SIGMA = 1;        // samples, Gaussian, per contiguous run (D17)
