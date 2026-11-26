@@ -25,6 +25,7 @@ export function startAnalysisRunner(store: Store<AppState>): void {
       updateTake(store, id, {
         contacts: r.contacts,
         metrics: r.metrics,
+        tier2: r.tier2,
         ...(take.attemptsSource === 'auto' ? { attempts: r.attempts } : {}),
       });
     }

@@ -34,3 +34,13 @@ describe('analyzeTake', () => {
     expect(r.metrics.touches).toEqual({ LH: 0, RH: 1, LF: 1, RF: 0, total: 2 });
   });
 });
+
+describe('analyzeTake Tier 2 results', () => {
+  it('fills tier2 with a heatmap of HEATMAP_COLS x HEATMAP_ROWS and metrics.tier2', () => {
+    const t = synthTrack({ duration: 2, limbs: { LF: still(0.5, 0.8, 0, 2) } });
+    const r = analyzeTake(takeOf(t, [{ id: 1, x: 0.5, y: 0.8 }]));
+    expect(r.tier2.heatmap).toHaveLength(64 * 36);
+    expect(Math.max(...r.tier2.heatmap)).toBe(1);
+    expect(r.metrics.tier2).toBeDefined();
+  });
+});

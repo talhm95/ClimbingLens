@@ -22,3 +22,13 @@ export const START_DWELL = 0.4;       // s, auto attempt start (D37)
 export const START_DWELL_DECAY = 1;   // samples lost per miss, leaky (D37)
 export const TOP_DWELL = 0.5;         // s, both hands on the top hold (D37)
 export const END_GAP = 1.0;           // s with no limb on a hold = fall (D37)
+
+// ---- Tier 2 (ARCHITECTURE.md section 4.5) ----
+export const HEATMAP_COLS = 64, HEATMAP_ROWS = 36;
+export const WEIGHT_TOL = 0.25;     // body scales, horizontal pelvis-to-foot offset
+export const DROP_SPEED = 3;        // body scales / s
+export const DROP_WINDOW = 0.3;     // s after a contact ends
+export const JUMP_SPEED = 2;        // body scales / s, pelvis
+export const JUMP_SHOW = 0.8;       // s an arrow stays on screen after take-off
+export const JUMP_MATCH = 1.0;      // s, max aligned-time gap to pair A and B jumps
+export const JUMP_ARROW_SCALE = 0.2; // arrow length in S per (S/s) of speed

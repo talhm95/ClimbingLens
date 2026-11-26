@@ -5,6 +5,7 @@ import { tr } from '../../ui/i18n';
 import { drawComparison } from './comparison';
 import { contactMarks, drawContacts } from './contacts';
 import { correctionMarks, correctionRows, drawCorrections } from './corrections';
+import { drawHeatmap } from './heatmap';
 import { drawHolds } from './holds';
 import { drawSkeleton } from './skeleton';
 import { timingRows } from './timing';
@@ -23,6 +24,7 @@ function touchRows(s: AppState) {
 }
 
 export const LAYERS: LayerDef[] = [
+  { id: 'heatmap', tier: 2, label: { en: 'Foot-contact heatmap', he: 'מפת חום של כפות הרגליים' }, needs: ['poses'], draw: drawHeatmap },
   { id: 'holds', tier: 1, label: { en: 'Hold numbers', he: 'מספרי אחיזות' }, needs: ['holds'], draw: drawHolds },
   { id: 'skeleton', tier: 1, label: { en: 'Stick figure', he: 'שלד' }, needs: ['poses'], draw: drawSkeleton },
   {
