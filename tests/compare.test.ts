@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { diffMetrics, firstAttemptMetrics } from '../src/analysis/compare';
 import { computeMetrics } from '../src/analysis/metrics';
 import type { LayerId, Metrics } from '../src/types';
+import { synthTrack } from './fixtures/synth';
+import { takeOf } from './fixtures/take';
 
 const ALL: LayerId[] = ['skeleton', 'holds', 'contacts', 'touches', 'footCorrections', 'timing', 'comparison', 'heatmap', 'weightShift', 'angles', 'jump', 'drops'];
 const only = (...on: LayerId[]) => Object.fromEntries(ALL.map((id) => [id, on.includes(id)])) as Record<LayerId, boolean>;
@@ -42,13 +44,40 @@ describe('diffMetrics', () => {
 });
 
 describe('firstAttemptMetrics (D19: comparison uses the first attempt)', () => {
+  const c = (attempt: number, corrections: number[] = []) => ({
+    limb: 'LF' as const, holdId: 1, start: attempt * 50, end: attempt * 50 + 1, pos: { x: 0, y: 0 }, corrections, attempt,
+  });
+
   it('counts only contacts of attempt 0 and times only the first attempt', () => {
-    const c = (attempt: number, corrections: number[] = []) => ({
-      limb: 'LF' as const, holdId: 1, start: 0, end: 1, pos: { x: 0, y: 0 }, corrections, attempt,
+    const take = takeOf(null, [], {
+      duration: 90,
+      contacts: [c(0, [0.5]), c(1, [50.5, 50.7]), c(1)],
+      attempts: [{ start: 0, end: 20 }, { start: 50, end: 80 }],
     });
-    const m = firstAttemptMetrics([c(0, [0.5]), c(1, [0.5, 0.7]), c(1)], [{ start: 0, end: 20 }, { start: 50, end: 80 }]);
+    const m = firstAttemptMetrics(take);
     expect(m.touches.total).toBe(1);
     expect(m.footCorrections.total).toBe(1);
     expect(m.attempts).toEqual([{ duration: 20 }]);
+  });
+
+  it('off balance is measured over the first attempt only', () => {
+    // Foot under the pelvis in attempt 1 (0-2 s), 0.4 S off to the side in attempt 2 (3-5 s).
+    const poses = synthTrack({ duration: 5, limbs: { LF: [{ t: 0, x: 0.5, y: 0.9 }, { t: 2.5, x: 0.5, y: 0.9 }, { t: 2.6, x: 0.42, y: 0.9 }] } });
+    const lf = (attempt: number, start: number, end: number) => ({ limb: 'LF' as const, holdId: 1, start, end, pos: { x: 0, y: 0 }, corrections: [], attempt });
+    const take = takeOf(poses, [], { contacts: [lf(0, 0, 2), lf(1, 3, 5)], attempts: [{ start: 0, end: 2 }, { start: 3, end: 5 }] });
+    expect(firstAttemptMetrics(take).tier2!.offBalance).toBe(0);
+  });
+});
+
+describe('diffMetrics Tier 2 rows (D33)', () => {
+  it('weight shift gives an off-balance row in %', () => {
+    const a = { ...metrics(0, 0, 10), tier2: { drops: 0, jumps: 0, firstJumpSpeed: null, offBalance: 0.3 } };
+    const b = { ...metrics(0, 0, 10), tier2: { drops: 0, jumps: 0, firstJumpSpeed: null, offBalance: 0.1 } };
+    const rows = diffMetrics(a, b, only('weightShift'));
+    expect(rows).toHaveLength(1);
+    expect(rows[0].key).toBe('offBalance');
+    expect(rows[0].unit).toBe('%');
+    expect(rows[0].a).toBeCloseTo(30, 9);
+    expect(rows[0].delta).toBeCloseTo(-20, 9);
   });
 });

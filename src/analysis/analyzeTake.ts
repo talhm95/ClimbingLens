@@ -5,6 +5,7 @@ import { clipToAttempts, detectContacts } from './contacts';
 import { heatmap } from './heatmap';
 import { bodyScale } from './limbs';
 import { computeMetrics, normalizeAttempts } from './metrics';
+import { offBalanceFraction } from './weightShift';
 
 export type TakeAnalysis = { contacts: Contact[]; metrics: Metrics; attempts: Attempt[]; tier2: Tier2Results };
 
@@ -27,7 +28,7 @@ export function analyzeTake(take: Take): TakeAnalysis {
   const tier2: Tier2Results = { heatmap: heatmap(track, contacts), drops: [], jumps: [] };
   const metrics: Metrics = {
     ...computeMetrics(contacts, attempts),
-    tier2: { drops: tier2.drops.length, jumps: tier2.jumps.length, firstJumpSpeed: null, offBalance: 0 },
+    tier2: { drops: tier2.drops.length, jumps: tier2.jumps.length, firstJumpSpeed: null, offBalance: offBalanceFraction(track, contacts, attempts) },
   };
   return { contacts, metrics, attempts, tier2 };
 }

@@ -1,14 +1,14 @@
 // "label · a → b (Δ)" for each checked metric (SPEC.md section 5). Lower is better for every
 // Tier 1 row (fewer touches or corrections, shorter time).
 import { diffMetrics, firstAttemptMetrics, type DiffRow } from '../analysis/compare';
-import { normalizeAttempts } from '../analysis/metrics';
 import { isOn, LAYERS } from '../overlay/layers/registry';
 import type { AppState } from '../types';
 import { bdi } from './format';
 import { tr } from './i18n';
 import type { PanelExtra } from './metricsPanel';
 
-const fmt = (v: number, unit: DiffRow['unit']) => (unit === 's' ? `${v.toFixed(1)} s` : String(Math.round(v)));
+const fmt = (v: number, unit: DiffRow['unit']) =>
+  unit === 's' ? `${v.toFixed(1)} s` : unit === '%' ? `${Math.round(v)}%` : unit === 'S/s' ? v.toFixed(1) : String(Math.round(v));
 const signed = (v: number, unit: DiffRow['unit']) => (v > 0 ? '+' : v < 0 ? '−' : '±') + fmt(Math.abs(v), unit);
 
 function rowLabel(key: string): string {
@@ -25,8 +25,8 @@ export const compareTableExtra: PanelExtra = (root, s: AppState) => {
   const tb = s.takes.B;
   if (!layer || !isOn(layer, s) || !ta?.metrics || !tb?.metrics) return;
   // Attempt against attempt: the first attempt of each take (D19).
-  const A = firstAttemptMetrics(ta.contacts, normalizeAttempts(ta.attempts, ta.duration));
-  const B = firstAttemptMetrics(tb.contacts, normalizeAttempts(tb.attempts, tb.duration));
+  const A = firstAttemptMetrics(ta);
+  const B = firstAttemptMetrics(tb);
   const box = document.createElement('div');
   box.className = 'group compare';
   const h = document.createElement('h3');
