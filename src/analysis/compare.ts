@@ -1,5 +1,11 @@
 // The A → B difference table: one row per checked scalar metric (SPEC.md section 5, D23). Pure.
-import type { LayerId, Metrics } from '../types';
+import type { Attempt, Contact, LayerId, Metrics } from '../types';
+import { computeMetrics } from './metrics';
+
+/** Metrics of the first attempt only: comparison is attempt against attempt (D19). */
+export function firstAttemptMetrics(contacts: Contact[], attempts: Attempt[]): Metrics {
+  return computeMetrics(contacts.filter((c) => c.attempt === 0), attempts.slice(0, 1));
+}
 
 export type DiffRow = { key: string; a: number; b: number; delta: number; unit: 'count' | 's' };
 

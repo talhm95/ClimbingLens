@@ -1,6 +1,7 @@
 // "label · a → b (Δ)" for each checked metric (SPEC.md section 5). Lower is better for every
 // Tier 1 row (fewer touches or corrections, shorter time).
-import { diffMetrics, type DiffRow } from '../analysis/compare';
+import { diffMetrics, firstAttemptMetrics, type DiffRow } from '../analysis/compare';
+import { normalizeAttempts } from '../analysis/metrics';
 import { isOn, LAYERS } from '../overlay/layers/registry';
 import type { AppState } from '../types';
 import { bdi } from './format';
@@ -20,9 +21,12 @@ function rowLabel(key: string): string {
 
 export const compareTableExtra: PanelExtra = (root, s: AppState) => {
   const layer = LAYERS.find((l) => l.id === 'comparison');
-  const A = s.takes.A?.metrics;
-  const B = s.takes.B?.metrics;
-  if (!layer || !isOn(layer, s) || !A || !B) return;
+  const ta = s.takes.A;
+  const tb = s.takes.B;
+  if (!layer || !isOn(layer, s) || !ta?.metrics || !tb?.metrics) return;
+  // Attempt against attempt: the first attempt of each take (D19).
+  const A = firstAttemptMetrics(ta.contacts, normalizeAttempts(ta.attempts, ta.duration));
+  const B = firstAttemptMetrics(tb.contacts, normalizeAttempts(tb.attempts, tb.duration));
   const box = document.createElement('div');
   box.className = 'group compare';
   const h = document.createElement('h3');

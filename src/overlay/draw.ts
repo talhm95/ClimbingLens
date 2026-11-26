@@ -8,6 +8,8 @@ export const LIMB_COLORS = { LH: '#4fc3f7', RH: '#1565c0', LF: '#ffb74d', RF: '#
 /** Text with a dark outline so it reads on any wall. */
 export function outlinedText(ctx: CanvasRenderingContext2D, text: string, p: Vec, size: number, color = '#fff', align: CanvasTextAlign = 'center'): void {
   ctx.save();
+  // Labels are Latin codes and numbers ("RH 2", "LF ×2"): keep them LTR in Hebrew mode too.
+  ctx.direction = 'ltr';
   ctx.font = `bold ${size}px ${FONT}`;
   ctx.textAlign = align;
   ctx.textBaseline = 'middle';

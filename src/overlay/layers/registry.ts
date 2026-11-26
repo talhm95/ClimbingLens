@@ -44,7 +44,7 @@ export const LAYERS: LayerDef[] = [
     timelineMarks: correctionMarks,
   },
   { id: 'timing', tier: 1, label: { en: 'Attempt & rest time', he: 'זמן ניסיון ומנוחה' }, needs: ['poses'], metrics: timingRows },
-  { id: 'comparison', tier: 1, label: { en: 'Compare with take A', he: 'השוואה לניסיון A' }, needs: ['takeB'], draw: drawComparison },
+  { id: 'comparison', tier: 1, label: { en: 'Compare with take A', he: 'השוואה לסרטון A' }, needs: ['takeB'], draw: drawComparison },
 ];
 
 /** A layer is available once everything in its `needs` exists. */

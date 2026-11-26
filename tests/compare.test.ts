@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { diffMetrics } from '../src/analysis/compare';
+import { diffMetrics, firstAttemptMetrics } from '../src/analysis/compare';
 import { computeMetrics } from '../src/analysis/metrics';
 import type { LayerId, Metrics } from '../src/types';
 
@@ -38,5 +38,17 @@ describe('diffMetrics', () => {
 
   it('touches gives a row per limb and the total', () => {
     expect(diffMetrics(a, b, only('touches'))).toHaveLength(5);
+  });
+});
+
+describe('firstAttemptMetrics (D19: comparison uses the first attempt)', () => {
+  it('counts only contacts of attempt 0 and times only the first attempt', () => {
+    const c = (attempt: number, corrections: number[] = []) => ({
+      limb: 'LF' as const, holdId: 1, start: 0, end: 1, pos: { x: 0, y: 0 }, corrections, attempt,
+    });
+    const m = firstAttemptMetrics([c(0, [0.5]), c(1, [0.5, 0.7]), c(1)], [{ start: 0, end: 20 }, { start: 50, end: 80 }]);
+    expect(m.touches.total).toBe(1);
+    expect(m.footCorrections.total).toBe(1);
+    expect(m.attempts).toEqual([{ duration: 20 }]);
   });
 });
