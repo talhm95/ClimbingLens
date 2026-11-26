@@ -1,12 +1,12 @@
 // Jump performance (Tier 2, ARCHITECTURE.md sections 4.5 and 6). Pure.
-import { JUMP_MATCH, JUMP_MIN_AIR, JUMP_SPEED } from '../config';
+import { JUMP_MATCH, JUMP_MIN_AIR, JUMP_MIN_RISE, JUMP_SPEED } from '../config';
 import type { Attempt, Contact, Jump, PoseTrack, Vec } from '../types';
 import { bodyScale, pelvisSeries } from './limbs';
 
 /**
  * An airborne sample is inside an attempt, has no limb contact covering it, and the smoothed
  * pelvis moves faster than JUMP_SPEED body scales / s. Each run of airborne samples lasting at
- * least JUMP_MIN_AIR is one jump (shorter runs are pose jitter on a small climber):
+ * least JUMP_MIN_AIR and taking off upward is one jump (shorter runs are pose jitter):
  * t = its first sample, v = pelvis velocity there (central difference, normalized units / s),
  * speed = |v| in body scales / s, firstLanding = limb of the earliest contact starting after t in
  * the same attempt.
@@ -42,9 +42,13 @@ export function detectJumps(track: PoseTrack, contacts: Contact[], attempts: Att
     }
     let j = i;
     while (j + 1 < airborne.length && airborne[j + 1]) j++;
-    if ((j - i + 1) / sr >= JUMP_MIN_AIR - 1e-9) {
+    const v = velocity(i)!;
+    // A climbing jump leaves the wall upward (or up and across); level motion is walking on the
+    // mat and downward motion is a fall, which drop events cover.
+    const rise = -v.y * track.videoH;
+    const upward = rise > JUMP_MIN_RISE * Math.hypot(v.x * track.videoW, v.y * track.videoH);
+    if ((j - i + 1) / sr >= JUMP_MIN_AIR - 1e-9 && upward) {
       const t = i / sr;
-      const v = velocity(i)!;
       const attempt = attempts.find((a) => t >= a.start && t <= a.end)!;
       const next = contacts
         .filter((c) => c.start > t && c.start <= attempt.end)

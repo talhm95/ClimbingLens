@@ -44,6 +44,12 @@ describe('detectJumps', () => {
     expect(detectJumps(glitch, [], [{ start: 0, end: 3 }])).toHaveLength(0);
   });
 
+  it('walking fast across the mat is not a jump', () => {
+    // Pelvis moves sideways at 3 S/s for 1 s, a little uphill, with no limb in contact (walking).
+    const walk = synthTrack({ duration: 3, limbs: {}, pelvis: [{ t: 0, x: 0.2, y: 0.7 }, { t: 1, x: 0.2, y: 0.7 }, { t: 2, x: 0.8, y: 0.68 }] });
+    expect(detectJumps(walk, [], [{ start: 0, end: 3 }])).toHaveLength(0);
+  });
+
   it('no jump outside an attempt', () => {
     expect(detectJumps(track, contacts, [{ start: 2, end: 3 }])).toHaveLength(0);
   });

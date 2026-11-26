@@ -35,8 +35,8 @@
 - [x] **Tier 1 demo run-through** - task 15, offline, tuned thresholds
 
 ## Tier 2
-- [ ] **Foot-contact heatmap** - task 16
-- [ ] **Weight shift** - task 17
-- [ ] **Joint angles (elbows)** - task 18
-- [ ] **Hand/foot drop events** - task 19
-- [ ] **Jump performance** - task 20
+- [x] **Foot-contact heatmap** - task 16
+- [x] **Weight shift** - task 17
+- [x] **Joint angles (elbows)** - task 18
+- [x] **Hand/foot drop events** - task 19
+- [x] **Jump performance** - task 20

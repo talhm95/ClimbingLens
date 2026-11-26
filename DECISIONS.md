@@ -312,3 +312,32 @@ kept it there for the rest of the clip. Over a whole clip the climber is the one
 spectator barely does. `pickClimber` (D36) is kept as the frame-to-frame linking rule. This
 supersedes D36's "longest torso" start only. Override: set `CLIMBER_MIN_SPEED = 0` and
 `NUM_POSES = 2` to get close to the old behaviour.
+
+**D40. Q:** After a top-out, the climber still has both feet and a hand on holds. Does that start a new attempt?
+**A:** No. After an attempt ends, `detectAttempts` looks for the next start only once no limb is on
+any hold (the climber has left the wall).
+**Why:** Without it, the plan's own top-out test produced a second, phantom attempt right after the first.
+
+**D41. Q:** Which attempt does the A → B difference table compare?
+**A:** The first attempt of each take, for every row (touches, corrections and Tier 2 too), as D19
+says. The table title says "first attempt".
+**Why:** The first version counted touches over all attempts but time over the first one only. The
+real clips are ~5 min with several attempts, so the rows did not describe the same climb.
+
+**D42. Q:** The comparison paths drew long straight spikes. Why, and what was done?
+**A:** When the climber is not detected for a moment, another moving person can be chosen (D39),
+and the line joined the two. A drawn path now breaks where two samples are more than
+`PATH_BREAK` (1.5 body lengths) apart.
+**Why:** Seen on `AYALA QWB1(2)`. A person cannot move that far in 1/15 s.
+
+**D43. Q:** What counts as a jump on real footage? *(Tier 2)*
+**A:** ARCHITECTURE 4.5, plus two rules: the airborne run lasts at least `JUMP_MIN_AIR` (0.2 s), and
+the take-off points upward by at least `JUMP_MIN_RISE` (upward share ≥ 0.25 of the speed, about 15°).
+**Why:** On a small climber (torso ~74 px), one-sample pose jitter passed 2 body lengths/s: a slab
+with no dynos showed 11 "jumps". Walking on the mat with no contact passed too. Now 4 on that slab
+(at attempt edges, stepping on or off the wall), and walking is not counted. A dyno with < 0.2 s of
+detected flight, or a nearly level one, is missed.
+
+**D44. Q:** Do comparison rows for jumps get green/red?
+**A:** No, jump count and take-off speed are neutral (grey). Fewer drops and less off-balance are green.
+**Why:** D33 says faster is not always better; the same holds for the number of jumps.

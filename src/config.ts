@@ -30,6 +30,7 @@ export const DROP_SPEED = 3;        // body scales / s
 export const DROP_WINDOW = 0.3;     // s after a contact ends
 export const JUMP_SPEED = 2;        // body scales / s, pelvis
 export const JUMP_MIN_AIR = 0.2;    // s, shortest airborne run that counts as a jump (shorter = pose jitter)
+export const JUMP_MIN_RISE = 0.25;  // take-off: upward share of the speed (about 15 degrees above level)
 export const JUMP_SHOW = 0.8;       // s an arrow stays on screen after take-off
 export const JUMP_MATCH = 1.0;      // s, max aligned-time gap to pair A and B jumps
 export const JUMP_ARROW_SCALE = 0.2; // arrow length in S per (S/s) of speed
